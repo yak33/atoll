@@ -245,23 +245,8 @@ const tooltipText = computed<string>(() => {
     @mouseleave="scheduleCollapse"
   />
 
-  <!-- 设置态 -->
-  <div v-else class="settings-wrap">
-    <SettingsPanel :initial="credential" @save="handleSave" @close="closeSettings" />
-    <div class="status-bar">
-      <span v-if="credential === null" class="status-text">未配置凭据,填入 API Key 后保存</span>
-      <template v-else>
-        <span class="status-text">
-          <template v-if="quotaError">{{ ERROR_SHORT[quotaError.kind] }} · {{ quotaError.message }}</template>
-          <template v-else-if="snapshot">{{ snapshot.planLevel || '未知套餐' }} · 更新于 {{ fetchedAgoText }}</template>
-          <template v-else>加载中…</template>
-        </span>
-        <button class="refresh-btn" type="button" :disabled="refreshing" @click="handleRefresh">
-          {{ refreshing ? '刷新中…' : '刷新' }}
-        </button>
-      </template>
-    </div>
-  </div>
+  <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->
+  <SettingsPanel v-else :initial="credential" @save="handleSave" @close="closeSettings" />
 </template>
 
 <style>
@@ -300,58 +285,5 @@ body {
   margin: 0;
   background: transparent;
   overflow: hidden;
-}
-</style>
-
-<style scoped>
-.settings-wrap {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.settings-wrap > :first-child {
-  flex: 1;
-  min-height: 0;
-}
-
-.status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  box-sizing: border-box;
-  margin: 0 10px 10px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  background: var(--surface-overlay);
-}
-
-.status-text {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.refresh-btn {
-  flex-shrink: 0;
-  height: 24px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 6px;
-  background: rgba(34, 197, 94, 0.16);
-  color: #4ade80;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  cursor: pointer;
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

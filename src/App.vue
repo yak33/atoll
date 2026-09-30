@@ -31,7 +31,7 @@ import SettingsPanel from './components/SettingsPanel.vue'
 
 const PILL_SIZE = new LogicalSize(260, 44)
 const EXPANDED_SIZE = new LogicalSize(400, 210)
-const SETTINGS_SIZE = new LogicalSize(340, 470)
+const SETTINGS_SIZE = new LogicalSize(340, 560)
 /** 鼠标离开面板后延迟收回,防止误触抖动(PRD §4.2) */
 const COLLAPSE_DELAY_MS = 500
 

@@ -183,7 +183,9 @@ onBeforeUnmount(() => {
 .panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* 100vh 而非 100%:根组件的父级是 body(无高度),百分比会退化成内容高度,
+     内容一超出窗口就被窗口矩形裁掉圆角 */
+  height: 100vh;
   box-sizing: border-box;
   border-radius: 16px;
   background: var(--bg-panel);

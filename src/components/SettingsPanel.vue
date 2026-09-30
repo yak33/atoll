@@ -6,7 +6,7 @@
  *
  * @author ZHANGCHAO 2026/10/01
  */
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import { loadTheme, saveTheme, type ThemeMode } from '../core/appSettings'
 import { setThemeMode } from '../core/theme'
@@ -27,7 +27,8 @@ const apiKey = ref(props.initial?.apiKey ?? '')
 const baseUrl = ref(props.initial?.baseUrl ?? DEFAULT_BASE_URL)
 const organizationId = ref(props.initial?.organizationId ?? '')
 const projectId = ref(props.initial?.projectId ?? '')
-const validationMessage = ref('')
+// 自动保存状态文案:空串 = 无事发生,「API Key 为空…」= 阻断提示,「已自动保存」= 成功
+const savedAtText = ref('')
 
 // 开机自启:独立于表单保存,切换即生效
 const autostartOn = ref(false)
@@ -72,27 +73,56 @@ async function handleAutostartToggle(): Promise<void> {
   }
 }
 
-function handleSave() {
+// ===== 凭据表单:防抖自动保存(800ms 无输入后落盘),无保存按钮 =====
+
+const AUTOSAVE_DELAY_MS = 800
+let saveTimer: number | null = null
+let dirty = false
+// 与「上次已提交」比较,改回原值时不触发无谓的保存与轮询重启
+let lastSavedJson = JSON.stringify(props.initial ?? null)
+
+watch([apiKey, baseUrl, organizationId, projectId], () => {
+  dirty = true
+  if (saveTimer !== null) clearTimeout(saveTimer)
+  saveTimer = window.setTimeout(commitCredential, AUTOSAVE_DELAY_MS)
+})
+
+function commitCredential(): void {
+  saveTimer = null
+  if (!dirty) return
+  dirty = false
+
   if (apiKey.value.trim() === '') {
-    validationMessage.value = 'API Key 不能为空'
+    savedAtText.value = 'API Key 为空,当前输入未保存'
     return
   }
-  if (baseUrl.value.trim() === '') {
-    validationMessage.value = 'base_url 不能为空'
-    return
-  }
-  validationMessage.value = ''
   const credential: ZhipuCredential = {
     apiKey: apiKey.value.trim(),
-    baseUrl: baseUrl.value.trim(),
+    baseUrl: baseUrl.value.trim() || DEFAULT_BASE_URL,
   }
   // 团队版字段:非空才写入,空串不入库,保证 organizationId 非空 == 团队版语义
   const org = organizationId.value.trim()
   if (org !== '') credential.organizationId = org
   const project = projectId.value.trim()
   if (project !== '') credential.projectId = project
+
+  const json = JSON.stringify(credential)
+  if (json === lastSavedJson) {
+    savedAtText.value = ''
+    return
+  }
+  lastSavedJson = json
   emit('save', credential)
+  savedAtText.value = '已自动保存'
 }
+
+// 关闭面板时冲刷未落盘的输入,防抖窗口内的改动不丢
+onBeforeUnmount(() => {
+  if (saveTimer !== null) {
+    clearTimeout(saveTimer)
+    commitCredential()
+  }
+})
 </script>
 
 <template>
@@ -102,7 +132,7 @@ function handleSave() {
       <button class="close-btn" type="button" @click="emit('close')">✕</button>
     </div>
 
-    <form class="form" @submit.prevent="handleSave">
+    <div class="form">
       <label class="field">
         <span class="field-label">API Key *</span>
         <input v-model="apiKey" type="password" class="input" placeholder="智谱开放平台 API Key" autocomplete="off" />
@@ -144,12 +174,8 @@ function handleSave() {
         <span class="field-label">开机自动启动</span>
       </label>
 
-      <div v-if="validationMessage" class="validation">{{ validationMessage }}</div>
-
-      <div class="actions">
-        <button class="btn-primary" type="submit">保存</button>
-      </div>
-    </form>
+      <div class="autosave-status">{{ savedAtText || '更改即时保存' }}</div>
+    </div>
   </div>
 </template>
 
@@ -303,30 +329,12 @@ function handleSave() {
   padding-top: 10px;
 }
 
-.validation {
-  color: #f87171;
-  font-size: 11px;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
-}
-
-.btn-primary {
-  height: 30px;
-  padding: 0 18px;
-  border: none;
-  border-radius: 8px;
-  background: #22c55e;
-  color: #052e16;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  background: #16a34a;
+/* 自动保存状态行:固定最小高度避免出现/消失时布局抖动 */
+.autosave-status {
+  min-height: 16px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: right;
 }
 </style>

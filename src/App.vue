@@ -153,13 +153,13 @@ async function toggleManualVisibility(): Promise<void> {
 
 // ===== 数据操作 =====
 
+/** 设置面板自动保存回调:落盘 + 重启轮询(不关面板,保存是即时的) */
 async function handleSave(next: ZhipuCredential): Promise<void> {
   await saveCredential(next)
   credential.value = next
   snapshot.value = null
   lastSnapshot = null
   quotaError.value = null
-  await closeSettings()
   poller.start(next)
 }
 

@@ -26,20 +26,22 @@ const emit = defineEmits<{
   dragstart: []
 }>()
 
-// ===== 标题行拖动移动窗口:位移超过阈值才算拖动,纯点击不误触 =====
+// ===== 整面板拖动移动窗口:位移超过阈值才算拖动;按钮上按下不参与 =====
 const DRAG_THRESHOLD_PX = 4
 let armed = false
 let downX = 0
 let downY = 0
 
-function onHeaderMouseDown(event: MouseEvent): void {
+function onPanelMouseDown(event: MouseEvent): void {
   if (event.button !== 0) return
+  // 刷新/设置按钮自身的按下留给点击,不进入拖动判定
+  if ((event.target as HTMLElement).closest('button') !== null) return
   armed = true
   downX = event.clientX
   downY = event.clientY
 }
 
-function onHeaderMouseMove(event: MouseEvent): void {
+function onPanelMouseMove(event: MouseEvent): void {
   if (!armed) return
   const moved = Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY)
   if (moved > DRAG_THRESHOLD_PX) {
@@ -48,7 +50,7 @@ function onHeaderMouseMove(event: MouseEvent): void {
   }
 }
 
-function onHeaderMouseUp(): void {
+function onPanelMouseUp(): void {
   armed = false
 }
 
@@ -74,14 +76,15 @@ function urgentOf(iso: string | null): boolean {
 </script>
 
 <template>
-  <div class="panel" @mouseenter="emit('mouseenter')" @mouseleave="emit('mouseleave')">
-    <div
-      class="panel-header"
-      title="按住拖动移动位置"
-      @mousedown="onHeaderMouseDown"
-      @mousemove="onHeaderMouseMove"
-      @mouseup="onHeaderMouseUp"
-    >
+  <div
+    class="panel"
+    @mouseenter="emit('mouseenter')"
+    @mouseleave="emit('mouseleave')"
+    @mousedown="onPanelMouseDown"
+    @mousemove="onPanelMouseMove"
+    @mouseup="onPanelMouseUp"
+  >
+    <div class="panel-header" title="按住任意位置拖动">
       <span class="plan">{{ planLevel || '未知套餐' }}</span>
       <span v-if="source === 'credit_limit'" class="credit-badge" title="该套餐仅上报信用额度,与 token 窗口度量不同">信用额度</span>
       <span class="drag-hint">⠿</span>
@@ -131,7 +134,12 @@ function urgentOf(iso: string | null): boolean {
   font-size: 12px;
   user-select: none;
   opacity: var(--widget-opacity);
+  cursor: grab;
   animation: panel-in 0.2s ease;
+}
+
+.panel:active {
+  cursor: grabbing;
 }
 
 @keyframes panel-in {
@@ -149,11 +157,6 @@ function urgentOf(iso: string | null): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  cursor: grab;
-}
-
-.panel-header:active {
-  cursor: grabbing;
 }
 
 .drag-hint {

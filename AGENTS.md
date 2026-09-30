@@ -10,7 +10,8 @@ Windows 桌面灵动岛悬浮组件(Tauri 2 + Vue 3 + TS)。首个模块:智谱 
 - `src/adapters/zhipu.test.ts` —— 解析规则单测,接口字段变更时先改这里再改实现
 - `src/types.ts` —— 统一数据模型(UsageWindow / ZhipuQuotaSnapshot / QuotaError)
 - `src/core/QuotaPoller.ts` —— 轮询调度:5 分钟 + 抖动,退避,单飞,凭据无效自动停
-- `src/core/credentialStore.ts` —— 凭据持久化(tauri-plugin-store → %APPDATA%)
+- `src/core/appSettings.ts` —— 设置持久化:智谱凭据 + 主题模式(tauri-plugin-store → %APPDATA%)
+- `src/core/theme.ts` —— 主题应用:浅/深/自动,auto 跟随系统并实时监听变化
 - `src/core/windowLayout.ts` —— 顶部居中定位与三态尺寸切换(scaleFactor 换算有单测)
 - `src/core/resetNotify.ts` —— 窗口重置事件检测(纯函数,单测在 core.test.ts)
 - `src/core/fullscreenWatch.ts` —— 全屏自动隐藏(前端轮询 Rust 命令,托盘手动隐藏优先)

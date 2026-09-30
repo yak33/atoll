@@ -87,8 +87,9 @@ function urgentOf(iso: string | null): boolean {
   height: 100%;
   padding: 14px 16px 12px;
   border-radius: 16px;
-  background: rgba(24, 24, 27, 0.96);
-  color: #e4e4e7;
+  background: var(--bg-panel);
+  border: 1px solid var(--pill-border);
+  color: var(--text-primary);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 12px;
   user-select: none;
@@ -126,7 +127,7 @@ function urgentOf(iso: string | null): boolean {
 }
 
 .no-data {
-  color: #71717a;
+  color: var(--text-muted);
   text-align: center;
   padding: 16px 0;
 }
@@ -141,14 +142,14 @@ function urgentOf(iso: string | null): boolean {
   width: 24px;
   font-size: 11px;
   font-weight: 600;
-  color: #a1a1aa;
+  color: var(--text-secondary);
 }
 
 .win-track {
   flex: 1;
   height: 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--track-bg);
   overflow: hidden;
 }
 
@@ -182,7 +183,7 @@ function urgentOf(iso: string | null): boolean {
   min-width: 52px;
   text-align: right;
   font-size: 10px;
-  color: #71717a;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -204,13 +205,13 @@ function urgentOf(iso: string | null): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--divider);
   padding-top: 8px;
 }
 
 .fetched {
   font-size: 10px;
-  color: #71717a;
+  color: var(--text-muted);
 }
 
 .footer-actions {
@@ -223,8 +224,8 @@ function urgentOf(iso: string | null): boolean {
   padding: 0 12px;
   border: none;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #d4d4d8;
+  background: var(--btn-bg);
+  color: var(--text-primary);
   font-size: 11px;
   font-weight: 600;
   font-family: inherit;
@@ -232,7 +233,7 @@ function urgentOf(iso: string | null): boolean {
 }
 
 .action-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--border-soft);
 }
 
 .action-btn:disabled {

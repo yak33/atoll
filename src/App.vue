@@ -16,7 +16,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
-import { loadCredential, saveCredential } from './core/credentialStore'
+import { loadCredential, loadTheme, saveCredential } from './core/appSettings'
+import { initTheme } from './core/theme'
 import { applyTopCenteredLayout } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
@@ -53,6 +54,7 @@ let collapseTimer: number | null = null
 const manualHidden = ref(false)
 let unlistenTray: (() => void) | null = null
 let stopFullscreenWatch: (() => void) | null = null
+let disposeTheme: (() => void) | null = null
 
 const poller = new QuotaPoller({
   onData: (data) => {
@@ -71,6 +73,8 @@ const poller = new QuotaPoller({
 })
 
 onMounted(async () => {
+  // 主题先行:避免首帧配色跳变(index.html 默认 data-theme="dark")
+  disposeTheme = initTheme(await loadTheme())
   await applyTopCenteredLayout(PILL_SIZE)
   credential.value = await loadCredential()
   booting.value = false
@@ -92,6 +96,7 @@ onBeforeUnmount(() => {
   poller.stop()
   unlistenTray?.()
   stopFullscreenWatch?.()
+  disposeTheme?.()
 })
 
 // ===== 三态切换 =====
@@ -260,6 +265,35 @@ const tooltipText = computed<string>(() => {
 </template>
 
 <style>
+/* ===== 主题变量:默认深色,html[data-theme='light'] 覆盖为浅色 ===== */
+:root {
+  --bg-surface: rgba(24, 24, 27, 0.92); /* 药丸 */
+  --bg-panel: rgba(24, 24, 27, 0.96); /* 展开面板/设置面板 */
+  --pill-border: transparent;
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --track-bg: rgba(255, 255, 255, 0.12); /* 进度条底槽 */
+  --border-soft: rgba(255, 255, 255, 0.14); /* 输入框描边 */
+  --divider: rgba(255, 255, 255, 0.08); /* 分隔线 */
+  --surface-overlay: rgba(255, 255, 255, 0.06); /* 状态条/输入框底 */
+  --btn-bg: rgba(255, 255, 255, 0.08); /* 次级按钮 */
+}
+
+html[data-theme='light'] {
+  --bg-surface: rgba(255, 255, 255, 0.94);
+  --bg-panel: rgba(255, 255, 255, 0.98);
+  --pill-border: rgba(9, 9, 11, 0.08); /* 浅色背景上给药丸一点描边防止融入壁纸 */
+  --text-primary: #27272a;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --track-bg: rgba(9, 9, 11, 0.1);
+  --border-soft: rgba(9, 9, 11, 0.16);
+  --divider: rgba(9, 9, 11, 0.08);
+  --surface-overlay: rgba(9, 9, 11, 0.05);
+  --btn-bg: rgba(9, 9, 11, 0.06);
+}
+
 /* 窗口透明,页面本体不能有背景色,否则整个矩形会显形 */
 html,
 body {
@@ -290,12 +324,12 @@ body {
   margin: 0 10px 10px;
   padding: 6px 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface-overlay);
 }
 
 .status-text {
   font-size: 11px;
-  color: #a1a1aa;
+  color: var(--text-secondary);
   font-family: 'Segoe UI', system-ui, sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;

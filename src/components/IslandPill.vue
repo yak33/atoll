@@ -72,26 +72,33 @@ const resetHighlight = computed<boolean>(() => {
   padding: 0 14px;
   box-sizing: border-box;
   border-radius: 22px;
-  background: rgba(24, 24, 27, 0.92);
-  color: #e4e4e7;
+  background: var(--bg-surface);
+  border: 1px solid var(--pill-border);
+  color: var(--text-primary);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 12px;
   user-select: none;
   cursor: pointer;
-  border: 1px solid transparent;
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* 告警态:整体着色 + 边框提示 */
+/* 告警态:深色调底色两套主题通用,文字强制浅色保证对比度 */
 .island-amber {
   background: rgba(69, 45, 11, 0.92);
   border-color: rgba(245, 158, 11, 0.45);
+  color: #e4e4e7;
 }
 
 .island-red {
   background: rgba(69, 15, 15, 0.92);
   border-color: rgba(239, 68, 68, 0.55);
+  color: #e4e4e7;
   animation: island-pulse 2s ease-in-out infinite;
+}
+
+.island-amber .label,
+.island-red .label {
+  color: rgba(228, 228, 231, 0.75);
 }
 
 /* >=90% 红色脉冲:呼吸式外发光 */
@@ -108,14 +115,14 @@ const resetHighlight = computed<boolean>(() => {
 .label {
   font-size: 11px;
   font-weight: 600;
-  color: #a1a1aa;
+  color: var(--text-secondary);
 }
 
 .track {
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--track-bg);
   overflow: hidden;
 }
 
@@ -147,7 +154,7 @@ const resetHighlight = computed<boolean>(() => {
 
 .reset {
   font-size: 10px;
-  color: #71717a;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -163,6 +170,6 @@ const resetHighlight = computed<boolean>(() => {
 }
 
 .empty {
-  color: #a1a1aa;
+  color: var(--text-secondary);
 }
 </style>

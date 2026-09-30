@@ -84,6 +84,8 @@ const themeMode = ref<ThemeMode>('auto')
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
 function applyAppearance(): void {
+  // 不透明度直接在这里写 CSS 变量:单跳直达,不依赖跨组件事件链的完整性
+  document.documentElement.style.setProperty('--bg-alpha', String(appearance.value.opacity))
   emit('appearance', { ...appearance.value })
 }
 

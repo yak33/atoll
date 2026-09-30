@@ -68,8 +68,9 @@ const resetHighlight = computed<boolean>(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 高度撑满窗口(窗口尺寸=用户自定义胶囊大小);圆角取满高实现胶囊两端半圆 */
-  height: 100%;
+  /* 100vh 而非 100%:根组件父级是 body(无高度),百分比会退化成内容高度,
+     药丸会缩成一行字高;窗口高度就是药丸高度,用视口高度撑满 */
+  height: 100vh;
   padding: 0 14px;
   box-sizing: border-box;
   border-radius: 9999px;

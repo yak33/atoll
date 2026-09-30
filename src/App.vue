@@ -55,6 +55,7 @@ const manualHidden = ref(false)
 let unlistenTray: (() => void) | null = null
 let stopFullscreenWatch: (() => void) | null = null
 let disposeTheme: (() => void) | null = null
+let unlistenFocus: (() => void) | null = null
 
 const poller = new QuotaPoller({
   onData: (data) => {
@@ -89,14 +90,27 @@ onMounted(async () => {
   stopFullscreenWatch = startFullscreenWatch({
     isManuallyHidden: () => manualHidden.value,
   })
+
+  // 设置态失焦自动关闭:置顶面板不该在用户切走后一直挡屏幕
+  unlistenFocus = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+    if (focused) {
+      cancelBlurClose()
+      return
+    }
+    if (mode.value === 'settings') {
+      scheduleBlurClose()
+    }
+  })
 })
 
 onBeforeUnmount(() => {
   cancelCollapse()
+  cancelBlurClose()
   poller.stop()
   unlistenTray?.()
   stopFullscreenWatch?.()
   disposeTheme?.()
+  unlistenFocus?.()
 })
 
 // ===== 三态切换 =====
@@ -133,7 +147,32 @@ async function openSettings(): Promise<void> {
 }
 
 async function closeSettings(): Promise<void> {
+  cancelBlurClose()
   await enterMode('pill')
+}
+
+// ===== 设置面板失焦自动关闭 =====
+
+/** 失焦超过该时长自动收回药丸;期间焦点回来则取消 */
+const SETTINGS_BLUR_CLOSE_MS = 3000
+let blurCloseTimer: number | null = null
+
+function cancelBlurClose(): void {
+  if (blurCloseTimer !== null) {
+    clearTimeout(blurCloseTimer)
+    blurCloseTimer = null
+  }
+}
+
+function scheduleBlurClose(): void {
+  cancelBlurClose()
+  blurCloseTimer = window.setTimeout(() => {
+    blurCloseTimer = null
+    // 计时期间可能已手动关闭/切模式,二次确认仍是设置态才收
+    if (mode.value === 'settings') {
+      void closeSettings()
+    }
+  }, SETTINGS_BLUR_CLOSE_MS)
 }
 
 /** 托盘显示/隐藏切换;隐藏前先收回药丸态,保证恢复时布局正确 */

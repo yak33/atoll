@@ -8,7 +8,15 @@
  */
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
-import { loadTheme, saveTheme, type ThemeMode } from '../core/appSettings'
+import {
+  loadAppearance,
+  loadTheme,
+  saveAppearance,
+  saveTheme,
+  DEFAULT_APPEARANCE,
+  type AppearanceSettings,
+  type ThemeMode,
+} from '../core/appSettings'
 import { setThemeMode } from '../core/theme'
 import type { ZhipuCredential } from '../adapters/zhipu'
 
@@ -18,6 +26,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   save: [credential: ZhipuCredential]
+  appearance: [settings: AppearanceSettings]
   close: []
 }>()
 
@@ -41,8 +50,24 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
 ]
 const themeMode = ref<ThemeMode>('auto')
 
+// 外观自定义:拖动实时预览(emit 给 App),松手落盘
+const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
+
+function applyAppearance(): void {
+  emit('appearance', { ...appearance.value })
+}
+
+async function commitAppearance(): Promise<void> {
+  try {
+    await saveAppearance(appearance.value)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
 onMounted(async () => {
   themeMode.value = await loadTheme()
+  appearance.value = await loadAppearance()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -168,6 +193,58 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">不透明度</span>
+          <span class="slider-value">{{ Math.round(appearance.opacity * 100) }}%</span>
+        </div>
+        <input
+          v-model.number="appearance.opacity"
+          type="range"
+          class="slider"
+          min="0.5"
+          max="1"
+          step="0.05"
+          @input="applyAppearance"
+          @change="commitAppearance"
+        />
+      </div>
+
+      <div class="section-title">胶囊</div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">长度</span>
+          <span class="slider-value">{{ appearance.pillWidth }}px</span>
+        </div>
+        <input
+          v-model.number="appearance.pillWidth"
+          type="range"
+          class="slider"
+          min="180"
+          max="420"
+          step="10"
+          @input="applyAppearance"
+          @change="commitAppearance"
+        />
+      </div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">高度</span>
+          <span class="slider-value">{{ appearance.pillHeight }}px</span>
+        </div>
+        <input
+          v-model.number="appearance.pillHeight"
+          type="range"
+          class="slider"
+          min="36"
+          max="64"
+          step="2"
+          @input="applyAppearance"
+          @change="commitAppearance"
+        />
+      </div>
+      <span class="field-hint">尺寸在收回药丸后生效</span>
+
       <div class="section-title">系统</div>
       <label class="toggle-row">
         <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
@@ -195,6 +272,7 @@ onBeforeUnmount(() => {
   font-size: 12px;
   padding: 14px 16px 16px;
   user-select: none;
+  opacity: var(--widget-opacity);
   overflow-y: auto;
 }
 
@@ -239,6 +317,32 @@ onBeforeUnmount(() => {
   background: rgba(34, 197, 94, 0.16);
   border-color: rgba(34, 197, 94, 0.4);
   color: #4ade80;
+}
+
+/* 滑杆字段:标签 + 当前值 + range */
+.slider-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slider-value {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  width: 100%;
+  height: 18px;
+  accent-color: #22c55e;
+  cursor: pointer;
 }
 
 .toggle-row {

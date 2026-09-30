@@ -15,6 +15,19 @@ const THEME_KEY = 'theme'
 /** 主题模式:auto = 跟随 Windows 系统深浅色 */
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
+/** 外观自定义:胶囊尺寸与整体不透明度(读写都会做范围钳制) */
+export interface AppearanceSettings {
+  pillWidth: number // 180-420,逻辑像素
+  pillHeight: number // 36-64
+  opacity: number // 0.5-1
+}
+
+export const DEFAULT_APPEARANCE: AppearanceSettings = {
+  pillWidth: 260,
+  pillHeight: 44,
+  opacity: 1,
+}
+
 // 模块级单例:多处 load 同一文件会报资源占用
 let storePromise: Promise<Awaited<ReturnType<typeof load>>> | null = null
 
@@ -23,6 +36,13 @@ function getStore() {
     storePromise = load(STORE_FILE, { autoSave: true })
   }
   return storePromise
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.min(max, Math.max(min, value))
+  }
+  return fallback
 }
 
 export async function loadCredential(): Promise<ZhipuCredential | null> {
@@ -59,5 +79,31 @@ export async function loadTheme(): Promise<ThemeMode> {
 export async function saveTheme(mode: ThemeMode): Promise<void> {
   const store = await getStore()
   await store.set(THEME_KEY, mode)
+  await store.save()
+}
+
+const APPEARANCE_KEY = 'appearance'
+
+/** 读取外观设置;存储缺字段或越界时逐项钳制/回落默认 */
+export async function loadAppearance(): Promise<AppearanceSettings> {
+  try {
+    const store = await getStore()
+    const raw = await store.get<Partial<AppearanceSettings>>(APPEARANCE_KEY)
+    if (raw !== null && typeof raw === 'object') {
+      return {
+        pillWidth: clampNumber(raw.pillWidth, 180, 420, DEFAULT_APPEARANCE.pillWidth),
+        pillHeight: clampNumber(raw.pillHeight, 36, 64, DEFAULT_APPEARANCE.pillHeight),
+        opacity: clampNumber(raw.opacity, 0.5, 1, DEFAULT_APPEARANCE.opacity),
+      }
+    }
+  } catch {
+    // 读取失败回落默认
+  }
+  return { ...DEFAULT_APPEARANCE }
+}
+
+export async function saveAppearance(settings: AppearanceSettings): Promise<void> {
+  const store = await getStore()
+  await store.set(APPEARANCE_KEY, settings)
   await store.save()
 }

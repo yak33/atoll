@@ -68,10 +68,11 @@ const resetHighlight = computed<boolean>(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 44px;
+  /* 高度撑满窗口(窗口尺寸=用户自定义胶囊大小);圆角取满高实现胶囊两端半圆 */
+  height: 100%;
   padding: 0 14px;
   box-sizing: border-box;
-  border-radius: 22px;
+  border-radius: 9999px;
   background: var(--bg-surface);
   border: 1px solid var(--pill-border);
   color: var(--text-primary);
@@ -79,6 +80,7 @@ const resetHighlight = computed<boolean>(() => {
   font-size: 12px;
   user-select: none;
   cursor: pointer;
+  opacity: var(--widget-opacity);
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 

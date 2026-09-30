@@ -96,6 +96,7 @@ function urgentOf(iso: string | null): boolean {
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 12px;
   user-select: none;
+  opacity: var(--widget-opacity);
   animation: panel-in 0.2s ease;
 }
 

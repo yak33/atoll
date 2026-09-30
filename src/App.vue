@@ -16,7 +16,14 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
-import { loadCredential, loadTheme, saveCredential } from './core/appSettings'
+import {
+  loadAppearance,
+  loadCredential,
+  loadTheme,
+  saveCredential,
+  type AppearanceSettings,
+  DEFAULT_APPEARANCE,
+} from './core/appSettings'
 import { initTheme } from './core/theme'
 import { applyTopCenteredLayout } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
@@ -29,9 +36,17 @@ import IslandPill from './components/IslandPill.vue'
 import ExpandedPanel from './components/ExpandedPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 
-const PILL_SIZE = new LogicalSize(260, 44)
-const EXPANDED_SIZE = new LogicalSize(400, 185)
-const SETTINGS_SIZE = new LogicalSize(340, 560)
+/** 药丸态窗口尺寸跟随用户自定义的胶囊大小 */
+const SETTINGS_SIZE = new LogicalSize(340, 700)
+
+function pillSize(): LogicalSize {
+  return new LogicalSize(appearance.value.pillWidth, appearance.value.pillHeight)
+}
+
+/** 展开态宽度至少 400,胶囊更长时跟随胶囊,避免展开反而比药丸窄 */
+function expandedSize(): LogicalSize {
+  return new LogicalSize(Math.max(400, appearance.value.pillWidth), 185)
+}
 /** 鼠标离开面板后延迟收回,防止误触抖动(PRD §4.2) */
 const COLLAPSE_DELAY_MS = 500
 
@@ -46,6 +61,21 @@ const refreshing = ref(false)
 
 // 重置检测需要上一份快照
 let lastSnapshot: ZhipuQuotaSnapshot | null = null
+
+// 外观自定义:不透明度实时生效,胶囊尺寸在药丸态立即应用
+const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
+
+function applyOpacityVar(): void {
+  document.documentElement.style.setProperty('--widget-opacity', String(appearance.value.opacity))
+}
+
+async function handleAppearance(next: AppearanceSettings): Promise<void> {
+  appearance.value = next
+  applyOpacityVar()
+  if (mode.value === 'pill') {
+    await applyTopCenteredLayout(pillSize())
+  }
+}
 
 let collapseTimer: number | null = null
 
@@ -74,9 +104,11 @@ const poller = new QuotaPoller({
 })
 
 onMounted(async () => {
-  // 主题先行:避免首帧配色跳变(index.html 默认 data-theme="dark")
+  // 主题与外观先行:避免首帧配色/尺寸跳变(index.html 默认 data-theme="dark")
   disposeTheme = initTheme(await loadTheme())
-  await applyTopCenteredLayout(PILL_SIZE)
+  appearance.value = await loadAppearance()
+  applyOpacityVar()
+  await applyTopCenteredLayout(pillSize())
   credential.value = await loadCredential()
   booting.value = false
   if (credential.value !== null) {
@@ -117,7 +149,7 @@ onBeforeUnmount(() => {
 
 async function enterMode(target: IslandMode): Promise<void> {
   mode.value = target
-  const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? EXPANDED_SIZE : PILL_SIZE
+  const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillSize()
   await applyTopCenteredLayout(size)
 }
 
@@ -285,12 +317,13 @@ const tooltipText = computed<string>(() => {
   />
 
   <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->
-  <SettingsPanel v-else :initial="credential" @save="handleSave" @close="closeSettings" />
+  <SettingsPanel v-else :initial="credential" @save="handleSave" @close="closeSettings" @appearance="handleAppearance" />
 </template>
 
 <style>
 /* ===== 主题变量:默认深色,html[data-theme='light'] 覆盖为浅色 ===== */
 :root {
+  --widget-opacity: 1; /* 整体不透明度,由设置面板实时写入 */
   --bg-surface: rgba(24, 24, 27, 0.92); /* 药丸 */
   --bg-panel: rgba(24, 24, 27, 0.96); /* 展开面板/设置面板 */
   --pill-border: transparent;

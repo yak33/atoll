@@ -1,0 +1,19 @@
+{
+  "identifier": "default",
+  "description": "灵动岛主窗口权限:http 仅放行智谱额度域名;store 持久化设置;set-size 用于药丸/设置面板尺寸切换。",
+  "windows": ["island"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-size",
+    "core:window:allow-set-position",
+    "store:default",
+    "notification:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://open.bigmodel.cn/*" },
+        { "url": "https://api.z.ai/*" }
+      ]
+    }
+  ]
+}

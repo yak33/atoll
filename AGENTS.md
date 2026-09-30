@@ -13,6 +13,7 @@ Windows 桌面灵动岛悬浮组件(Tauri 2 + Vue 3 + TS)。首个模块:智谱 
 - `src/core/credentialStore.ts` —— 凭据持久化(tauri-plugin-store → %APPDATA%)
 - `src/core/windowLayout.ts` —— 顶部居中定位与三态尺寸切换(scaleFactor 换算有单测)
 - `src/core/resetNotify.ts` —— 窗口重置事件检测(纯函数,单测在 core.test.ts)
+- `src/core/fullscreenWatch.ts` —— 全屏自动隐藏(前端轮询 Rust 命令,托盘手动隐藏优先)
 - `src/core/notify.ts` —— Windows toast 封装(权限被拒静默跳过)
 - `src/composables/nowTick.ts` —— 应用级 60s 时钟 + 倒计时格式化
 - `src/components/IslandPill.vue` —— 收起态药丸(告警配色/脉冲)

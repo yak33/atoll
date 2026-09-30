@@ -6,8 +6,13 @@
     "core:default",
     "core:window:allow-set-size",
     "core:window:allow-set-position",
+    "core:window:allow-hide",
+    "core:window:allow-show",
     "store:default",
     "notification:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled",
     {
       "identifier": "http:default",
       "allow": [

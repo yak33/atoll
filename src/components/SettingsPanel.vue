@@ -6,7 +6,8 @@
  *
  * @author ZHANGCHAO 2026/10/01
  */
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import type { ZhipuCredential } from '../adapters/zhipu'
 
 const props = defineProps<{
@@ -25,6 +26,30 @@ const baseUrl = ref(props.initial?.baseUrl ?? DEFAULT_BASE_URL)
 const organizationId = ref(props.initial?.organizationId ?? '')
 const projectId = ref(props.initial?.projectId ?? '')
 const validationMessage = ref('')
+
+// 开机自启:独立于表单保存,切换即生效
+const autostartOn = ref(false)
+
+onMounted(async () => {
+  try {
+    autostartOn.value = await isEnabled()
+  } catch {
+    // 查询失败保持默认不勾选
+  }
+})
+
+async function handleAutostartToggle(): Promise<void> {
+  try {
+    if (autostartOn.value) {
+      await enable()
+    } else {
+      await disable()
+    }
+  } catch {
+    // 失败回滚勾选状态
+    autostartOn.value = !autostartOn.value
+  }
+}
 
 function handleSave() {
   if (apiKey.value.trim() === '') {
@@ -79,6 +104,12 @@ function handleSave() {
       </label>
       <span class="field-hint">团队版必填组织 ID,否则官方返回「当前用户不存在coding plan」</span>
 
+      <div class="section-title">系统</div>
+      <label class="toggle-row">
+        <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
+        <span class="field-label">开机自动启动</span>
+      </label>
+
       <div v-if="validationMessage" class="validation">{{ validationMessage }}</div>
 
       <div class="actions">
@@ -102,6 +133,20 @@ function handleSave() {
   padding: 14px 16px 16px;
   user-select: none;
   overflow-y: auto;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox {
+  accent-color: #22c55e;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
 }
 
 .header {

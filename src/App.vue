@@ -13,12 +13,14 @@
  * @author ZHANGCHAO 2026/09/30
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { LogicalSize } from '@tauri-apps/api/window'
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
+import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
 import { loadCredential, saveCredential } from './core/credentialStore'
 import { applyTopCenteredLayout } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
+import { startFullscreenWatch } from './core/fullscreenWatch'
 import { nowTick } from './composables/nowTick'
 import type { ZhipuCredential } from './adapters/zhipu'
 import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
@@ -46,6 +48,12 @@ let lastSnapshot: ZhipuQuotaSnapshot | null = null
 
 let collapseTimer: number | null = null
 
+// ===== 系统集成(M3)=====
+// 托盘手动隐藏标志:全屏自动恢复不越过用户意愿
+const manualHidden = ref(false)
+let unlistenTray: (() => void) | null = null
+let stopFullscreenWatch: (() => void) | null = null
+
 const poller = new QuotaPoller({
   onData: (data) => {
     const messages = detectResetNotifications(lastSnapshot, data, Date.now())
@@ -69,11 +77,21 @@ onMounted(async () => {
   if (credential.value !== null) {
     poller.start(credential.value)
   }
+
+  // 托盘「显示/隐藏」:可见性统一由前端管理,与全屏自动隐藏互不打架
+  unlistenTray = await listen('tray:toggle-visibility', () => {
+    void toggleManualVisibility()
+  })
+  stopFullscreenWatch = startFullscreenWatch({
+    isManuallyHidden: () => manualHidden.value,
+  })
 })
 
 onBeforeUnmount(() => {
   cancelCollapse()
   poller.stop()
+  unlistenTray?.()
+  stopFullscreenWatch?.()
 })
 
 // ===== 三态切换 =====
@@ -111,6 +129,21 @@ async function openSettings(): Promise<void> {
 
 async function closeSettings(): Promise<void> {
   await enterMode('pill')
+}
+
+/** 托盘显示/隐藏切换;隐藏前先收回药丸态,保证恢复时布局正确 */
+async function toggleManualVisibility(): Promise<void> {
+  const win = getCurrentWindow()
+  if (!manualHidden.value) {
+    manualHidden.value = true
+    cancelCollapse()
+    await enterMode('pill')
+    await win.hide()
+  } else {
+    manualHidden.value = false
+    await enterMode('pill')
+    await win.show()
+  }
 }
 
 // ===== 数据操作 =====

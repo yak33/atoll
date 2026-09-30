@@ -32,10 +32,17 @@ export function topCenterPosition(
   return new PhysicalPosition(x, y)
 }
 
-/** 应用目标尺寸并保持顶部居中(尺寸切换与定位永远成对出现) */
-export async function applyTopCenteredLayout(size: LogicalSize): Promise<void> {
+/**
+ * 应用目标尺寸并落位:有用户拖动过的锚点位置则钉在锚点,
+ * 否则顶部居中(尺寸切换与定位永远成对出现)。
+ */
+export async function applyIslandLayout(size: LogicalSize, anchor: PhysicalPosition | null): Promise<void> {
   const win = getCurrentWindow()
   await win.setSize(size)
+  if (anchor !== null) {
+    await win.setPosition(anchor)
+    return
+  }
   const monitor = await currentMonitor()
   if (monitor === null) return
   await win.setPosition(topCenterPosition(monitor, size.width))

@@ -104,3 +104,39 @@ export async function saveAppearance(settings: AppearanceSettings): Promise<void
   await store.set(APPEARANCE_KEY, settings)
   await store.save()
 }
+
+/** 用户拖动后的窗口位置(物理像素);null = 未自定义,使用顶部居中 */
+export interface PillPosition {
+  x: number
+  y: number
+}
+
+const PILL_POSITION_KEY = 'pill_position'
+
+export async function loadPillPosition(): Promise<PillPosition | null> {
+  try {
+    const store = await getStore()
+    const value = await store.get<PillPosition>(PILL_POSITION_KEY)
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      Number.isFinite(value.x) &&
+      Number.isFinite(value.y)
+    ) {
+      return { x: value.x, y: value.y }
+    }
+  } catch {
+    // 读取失败按未自定义处理
+  }
+  return null
+}
+
+export async function savePillPosition(position: PillPosition | null): Promise<void> {
+  const store = await getStore()
+  if (position === null) {
+    await store.delete(PILL_POSITION_KEY)
+  } else {
+    await store.set(PILL_POSITION_KEY, position)
+  }
+  await store.save()
+}

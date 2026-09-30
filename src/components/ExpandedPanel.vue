@@ -23,7 +23,34 @@ const emit = defineEmits<{
   settings: []
   mouseenter: []
   mouseleave: []
+  dragstart: []
 }>()
+
+// ===== 标题行拖动移动窗口:位移超过阈值才算拖动,纯点击不误触 =====
+const DRAG_THRESHOLD_PX = 4
+let armed = false
+let downX = 0
+let downY = 0
+
+function onHeaderMouseDown(event: MouseEvent): void {
+  if (event.button !== 0) return
+  armed = true
+  downX = event.clientX
+  downY = event.clientY
+}
+
+function onHeaderMouseMove(event: MouseEvent): void {
+  if (!armed) return
+  const moved = Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY)
+  if (moved > DRAG_THRESHOLD_PX) {
+    armed = false
+    emit('dragstart')
+  }
+}
+
+function onHeaderMouseUp(): void {
+  armed = false
+}
 
 function barClass(percent: number): string {
   if (percent >= 90) return 'bar-red'
@@ -48,9 +75,16 @@ function urgentOf(iso: string | null): boolean {
 
 <template>
   <div class="panel" @mouseenter="emit('mouseenter')" @mouseleave="emit('mouseleave')">
-    <div class="panel-header">
+    <div
+      class="panel-header"
+      title="按住拖动移动位置"
+      @mousedown="onHeaderMouseDown"
+      @mousemove="onHeaderMouseMove"
+      @mouseup="onHeaderMouseUp"
+    >
       <span class="plan">{{ planLevel || '未知套餐' }}</span>
       <span v-if="source === 'credit_limit'" class="credit-badge" title="该套餐仅上报信用额度,与 token 窗口度量不同">信用额度</span>
+      <span class="drag-hint">⠿</span>
     </div>
 
     <div v-if="windows.length === 0" class="no-data">暂无窗口数据</div>
@@ -115,6 +149,17 @@ function urgentOf(iso: string | null): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  cursor: grab;
+}
+
+.panel-header:active {
+  cursor: grabbing;
+}
+
+.drag-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 .plan {

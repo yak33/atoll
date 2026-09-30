@@ -13,19 +13,21 @@
  * @author ZHANGCHAO 2026/09/30
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
+import { getCurrentWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
 import {
   loadAppearance,
   loadCredential,
+  loadPillPosition,
   loadTheme,
   saveCredential,
+  savePillPosition,
   type AppearanceSettings,
   DEFAULT_APPEARANCE,
 } from './core/appSettings'
 import { initTheme } from './core/theme'
-import { applyTopCenteredLayout } from './core/windowLayout'
+import { applyIslandLayout } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
 import { startFullscreenWatch } from './core/fullscreenWatch'
@@ -66,6 +68,9 @@ let lastSnapshot: ZhipuQuotaSnapshot | null = null
 // 外观自定义:不透明度实时生效,胶囊尺寸在药丸态立即应用
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
+// 用户拖动过的窗口锚点(物理像素);null = 未自定义,布局回落顶部居中
+let customPosition: PhysicalPosition | null = null
+
 function applyOpacityVar(): void {
   document.documentElement.style.setProperty('--widget-opacity', String(appearance.value.opacity))
 }
@@ -74,7 +79,39 @@ async function handleAppearance(next: AppearanceSettings): Promise<void> {
   appearance.value = next
   applyOpacityVar()
   if (mode.value === 'pill') {
-    await applyTopCenteredLayout(pillSize())
+    await applyIslandLayout(pillSize(), customPosition)
+  }
+}
+
+/** 展开面板标题行拖动:交给系统移动窗口,松手后记录并持久化新位置 */
+async function handleDragStart(): Promise<void> {
+  cancelCollapse()
+  await getCurrentWindow().startDragging()
+  const onMouseUp = () => {
+    document.removeEventListener('mouseup', onMouseUp)
+    void getCurrentWindow()
+      .outerPosition()
+      .then((pos) => {
+        customPosition = new PhysicalPosition(pos.x, pos.y)
+        return savePillPosition({ x: pos.x, y: pos.y })
+      })
+      .catch(() => {
+        // 位置持久化失败仅影响下次启动的落位,本次会话内存锚点仍生效
+      })
+  }
+  document.addEventListener('mouseup', onMouseUp)
+}
+
+/** 设置面板「重置位置」:清锚点并回到顶部居中 */
+async function handleResetPosition(): Promise<void> {
+  customPosition = null
+  try {
+    await savePillPosition(null)
+  } catch {
+    // 清理失败不影响本次会话回落
+  }
+  if (mode.value !== 'settings') {
+    await applyIslandLayout(pillSize(), null)
   }
 }
 
@@ -108,8 +145,10 @@ onMounted(async () => {
   // 主题与外观先行:避免首帧配色/尺寸跳变(index.html 默认 data-theme="dark")
   disposeTheme = initTheme(await loadTheme())
   appearance.value = await loadAppearance()
+  const savedPos = await loadPillPosition()
+  customPosition = savedPos !== null ? new PhysicalPosition(savedPos.x, savedPos.y) : null
   applyOpacityVar()
-  await applyTopCenteredLayout(pillSize())
+  await applyIslandLayout(pillSize(), customPosition)
   credential.value = await loadCredential()
   booting.value = false
   if (credential.value !== null) {
@@ -151,7 +190,7 @@ onBeforeUnmount(() => {
 async function enterMode(target: IslandMode): Promise<void> {
   mode.value = target
   const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillSize()
-  await applyTopCenteredLayout(size)
+  await applyIslandLayout(size, customPosition)
 }
 
 async function handlePillHover(): Promise<void> {
@@ -315,10 +354,18 @@ const tooltipText = computed<string>(() => {
     @settings="openSettings"
     @mouseenter="cancelCollapse"
     @mouseleave="scheduleCollapse"
+    @dragstart="handleDragStart"
   />
 
   <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->
-  <SettingsPanel v-else :initial="credential" @save="handleSave" @close="closeSettings" @appearance="handleAppearance" />
+  <SettingsPanel
+    v-else
+    :initial="credential"
+    @save="handleSave"
+    @close="closeSettings"
+    @appearance="handleAppearance"
+    @reset-position="handleResetPosition"
+  />
 </template>
 
 <style>

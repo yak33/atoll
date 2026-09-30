@@ -27,6 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   save: [credential: ZhipuCredential]
   appearance: [settings: AppearanceSettings]
+  resetPosition: []
   close: []
 }>()
 
@@ -227,7 +228,8 @@ onBeforeUnmount(() => {
           @change="commitAppearance"
         />
       </div>
-      <span class="field-hint">长度在收回药丸后生效</span>
+      <span class="field-hint">长度在收回药丸后生效;拖动展开面板标题行可移动位置</span>
+      <button class="reset-pos-btn" type="button" @click="emit('resetPosition')">重置窗口位置(回到顶部居中)</button>
 
       <div class="section-title">系统</div>
       <label class="toggle-row">
@@ -327,6 +329,23 @@ onBeforeUnmount(() => {
   height: 18px;
   accent-color: #22c55e;
   cursor: pointer;
+}
+
+.reset-pos-btn {
+  align-self: flex-start;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.reset-pos-btn:hover {
+  color: var(--text-primary);
 }
 
 .toggle-row {

@@ -292,7 +292,6 @@ onBeforeUnmount(() => {
   font-size: 12px;
   padding: 14px 16px 16px;
   user-select: none;
-  opacity: var(--widget-opacity);
   overflow-y: auto;
   cursor: grab;
 }

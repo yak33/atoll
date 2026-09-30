@@ -81,19 +81,19 @@ const resetHighlight = computed<boolean>(() => {
   font-size: 12px;
   user-select: none;
   cursor: pointer;
-  opacity: var(--widget-opacity);
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* 告警态:深色调底色两套主题通用,文字强制浅色保证对比度 */
+/* 告警态:深色调底色两套主题通用,文字强制浅色保证对比度;
+   背景同样跟随 --bg-alpha,与普通态透明度一致 */
 .island-amber {
-  background: rgba(69, 45, 11, 0.92);
+  background: rgb(69 45 11 / var(--bg-alpha));
   border-color: rgba(245, 158, 11, 0.45);
   color: #e4e4e7;
 }
 
 .island-red {
-  background: rgba(69, 15, 15, 0.92);
+  background: rgb(69 15 15 / var(--bg-alpha));
   border-color: rgba(239, 68, 68, 0.55);
   color: #e4e4e7;
   animation: island-pulse 2s ease-in-out infinite;

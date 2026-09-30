@@ -74,7 +74,7 @@ const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 let lastPersistedPos: PillPosition | null = null
 
 function applyOpacityVar(): void {
-  document.documentElement.style.setProperty('--widget-opacity', String(appearance.value.opacity))
+  document.documentElement.style.setProperty('--bg-alpha', String(appearance.value.opacity))
 }
 
 async function handleAppearance(next: AppearanceSettings): Promise<void> {
@@ -372,9 +372,10 @@ const tooltipText = computed<string>(() => {
 <style>
 /* ===== 主题变量:默认深色,html[data-theme='light'] 覆盖为浅色 ===== */
 :root {
-  --widget-opacity: 1; /* 整体不透明度,由设置面板实时写入 */
-  --bg-surface: rgba(24, 24, 27, 0.92); /* 药丸 */
-  --bg-panel: rgba(24, 24, 27, 0.96); /* 展开面板/设置面板 */
+  --bg-alpha: 1; /* 背景 alpha(0.5-1),由设置面板实时写入;文字不受影响 */
+  --surface-rgb: 24 24 27; /* 深色主题背景基色 */
+  --bg-surface: rgb(var(--surface-rgb) / var(--bg-alpha)); /* 药丸 */
+  --bg-panel: rgb(var(--surface-rgb) / var(--bg-alpha)); /* 展开面板/设置面板 */
   --pill-border: transparent;
   --text-primary: #e4e4e7;
   --text-secondary: #a1a1aa;
@@ -387,8 +388,7 @@ const tooltipText = computed<string>(() => {
 }
 
 html[data-theme='light'] {
-  --bg-surface: rgba(255, 255, 255, 0.94);
-  --bg-panel: rgba(255, 255, 255, 0.98);
+  --surface-rgb: 255 255 255;
   --pill-border: rgba(9, 9, 11, 0.08); /* 浅色背景上给药丸一点描边防止融入壁纸 */
   --text-primary: #27272a;
   --text-secondary: #52525b;

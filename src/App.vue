@@ -24,10 +24,11 @@ import {
   saveCredential,
   savePillPosition,
   type AppearanceSettings,
+  type PillPosition,
   DEFAULT_APPEARANCE,
 } from './core/appSettings'
 import { initTheme } from './core/theme'
-import { applyIslandLayout } from './core/windowLayout'
+import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
 import { startFullscreenWatch } from './core/fullscreenWatch'
@@ -68,8 +69,9 @@ let lastSnapshot: ZhipuQuotaSnapshot | null = null
 // 外观自定义:不透明度实时生效,胶囊尺寸在药丸态立即应用
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
-// 用户拖动过的窗口锚点(物理像素);null = 未自定义,布局回落顶部居中
-let customPosition: PhysicalPosition | null = null
+// 已持久化的窗口锚点(物理像素);null = 从未自定义,初始落位用顶部居中。
+// 拖动结束时机在模态循环里探测不可靠,改为在每次状态切换时读窗口真实位置。
+let lastPersistedPos: PillPosition | null = null
 
 function applyOpacityVar(): void {
   document.documentElement.style.setProperty('--widget-opacity', String(appearance.value.opacity))
@@ -79,42 +81,27 @@ async function handleAppearance(next: AppearanceSettings): Promise<void> {
   appearance.value = next
   applyOpacityVar()
   if (mode.value === 'pill') {
-    await applyIslandLayout(pillSize(), customPosition)
+    await resizeInPlace(pillSize())
   }
 }
 
-/** 展开面板拖动:交给系统移动窗口,结束后记录并持久化新位置。
- *  mouseup 监听必须挂在 startDragging 之前——Windows 拖动是模态循环,
- *  等 await 返回时 mouseup 可能已经错过;await 之后再兜底读一次位置,
- *  两条路径殊途同归(谁后执行谁写入最终值)。 */
+/** 展开面板拖动:交给系统移动窗口。新位置不在此处读取——
+ *  收回/切换状态时统一读窗口真实位置并持久化(见 enterMode)。 */
 async function handleDragStart(): Promise<void> {
   cancelCollapse()
-  const persistPosition = () => {
-    void getCurrentWindow()
-      .outerPosition()
-      .then((pos) => {
-        customPosition = new PhysicalPosition(pos.x, pos.y)
-        return savePillPosition({ x: pos.x, y: pos.y })
-      })
-      .catch(() => {
-        // 位置持久化失败仅影响下次启动的落位,本次会话内存锚点仍生效
-      })
-  }
-  document.addEventListener('mouseup', persistPosition, { once: true })
   await getCurrentWindow().startDragging()
-  persistPosition()
 }
 
 /** 设置面板「重置位置」:清锚点并回到顶部居中 */
 async function handleResetPosition(): Promise<void> {
-  customPosition = null
+  lastPersistedPos = null
   try {
     await savePillPosition(null)
   } catch {
     // 清理失败不影响本次会话回落
   }
   if (mode.value !== 'settings') {
-    await applyIslandLayout(pillSize(), null)
+    await applyInitialLayout(pillSize(), null)
   }
 }
 
@@ -149,9 +136,9 @@ onMounted(async () => {
   disposeTheme = initTheme(await loadTheme())
   appearance.value = await loadAppearance()
   const savedPos = await loadPillPosition()
-  customPosition = savedPos !== null ? new PhysicalPosition(savedPos.x, savedPos.y) : null
+  lastPersistedPos = savedPos
   applyOpacityVar()
-  await applyIslandLayout(pillSize(), customPosition)
+  await applyInitialLayout(pillSize(), savedPos !== null ? new PhysicalPosition(savedPos.x, savedPos.y) : null)
   credential.value = await loadCredential()
   booting.value = false
   if (credential.value !== null) {
@@ -190,10 +177,21 @@ onBeforeUnmount(() => {
 
 // ===== 三态切换 =====
 
+/** 状态切换:就地按目标尺寸伸缩;位置有变化才写盘(悬停收展不刷 store) */
 async function enterMode(target: IslandMode): Promise<void> {
   mode.value = target
   const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillSize()
-  await applyIslandLayout(size, customPosition)
+  const anchor = await resizeInPlace(size)
+  if (anchor === null) return
+  const pos = { x: anchor.x, y: anchor.y }
+  if (JSON.stringify(pos) !== JSON.stringify(lastPersistedPos)) {
+    lastPersistedPos = pos
+    try {
+      await savePillPosition(pos)
+    } catch {
+      // 持久化失败仅影响下次启动落位
+    }
+  }
 }
 
 async function handlePillHover(): Promise<void> {

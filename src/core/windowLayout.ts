@@ -1,6 +1,10 @@
 /**
- * 窗口布局(M2):顶部居中定位 + 三态尺寸切换。
+ * 窗口布局(M2/M3 迭代):初始落位 + 就地尺寸切换。
  * 纯计算部分(topCenterPosition)独立导出,可单测。
+ *
+ * 布局规则:应用启动时按「保存的锚点 > 顶部居中」落位;之后所有尺寸切换
+ * 一律锚定窗口当前位置就地伸缩(用户拖到哪,就在哪收展),窗口永不回弹。
+ * 位置读取放在切换时刻——拖动的模态循环早已结束,读到的永远准确。
  *
  * @author ZHANGCHAO 2026/10/01
  */
@@ -32,15 +36,28 @@ export function topCenterPosition(
   return new PhysicalPosition(x, y)
 }
 
-/**
- * 应用目标尺寸并落位:有用户拖动过的锚点位置则钉在锚点,
- * 否则顶部居中(尺寸切换与定位永远成对出现)。
- */
-export async function applyIslandLayout(size: LogicalSize, anchor: PhysicalPosition | null): Promise<void> {
+/** 就地改尺寸:先读当前窗口位置,再按该锚点伸缩;返回锚点(读取失败返回 null) */
+export async function resizeInPlace(size: LogicalSize): Promise<PhysicalPosition | null> {
+  const win = getCurrentWindow()
+  let anchor: PhysicalPosition
+  try {
+    anchor = await win.outerPosition()
+  } catch {
+    // 位置读取失败(极少见)退回只改尺寸,不移动
+    await win.setSize(size)
+    return null
+  }
+  await win.setSize(size)
+  await win.setPosition(anchor)
+  return anchor
+}
+
+/** 初始落位:有保存的锚点用锚点,否则主显示器顶部居中 */
+export async function applyInitialLayout(size: LogicalSize, saved: PhysicalPosition | null): Promise<void> {
   const win = getCurrentWindow()
   await win.setSize(size)
-  if (anchor !== null) {
-    await win.setPosition(anchor)
+  if (saved !== null) {
+    await win.setPosition(saved)
     return
   }
   const monitor = await currentMonitor()

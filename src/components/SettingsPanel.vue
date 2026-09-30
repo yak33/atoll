@@ -227,23 +227,7 @@ onBeforeUnmount(() => {
           @change="commitAppearance"
         />
       </div>
-      <div class="slider-field">
-        <div class="slider-head">
-          <span class="field-label">高度</span>
-          <span class="slider-value">{{ appearance.pillHeight }}px</span>
-        </div>
-        <input
-          v-model.number="appearance.pillHeight"
-          type="range"
-          class="slider"
-          min="36"
-          max="64"
-          step="2"
-          @input="applyAppearance"
-          @change="commitAppearance"
-        />
-      </div>
-      <span class="field-hint">尺寸在收回药丸后生效</span>
+      <span class="field-hint">长度在收回药丸后生效</span>
 
       <div class="section-title">系统</div>
       <label class="toggle-row">

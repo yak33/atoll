@@ -15,16 +15,14 @@ const THEME_KEY = 'theme'
 /** 主题模式:auto = 跟随 Windows 系统深浅色 */
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
-/** 外观自定义:胶囊尺寸与整体不透明度(读写都会做范围钳制) */
+/** 外观自定义:胶囊长度与整体不透明度(读写都会做范围钳制);高度固定不走配置 */
 export interface AppearanceSettings {
   pillWidth: number // 180-420,逻辑像素
-  pillHeight: number // 36-64
   opacity: number // 0.5-1
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   pillWidth: 260,
-  pillHeight: 44,
   opacity: 1,
 }
 
@@ -92,7 +90,6 @@ export async function loadAppearance(): Promise<AppearanceSettings> {
     if (raw !== null && typeof raw === 'object') {
       return {
         pillWidth: clampNumber(raw.pillWidth, 180, 420, DEFAULT_APPEARANCE.pillWidth),
-        pillHeight: clampNumber(raw.pillHeight, 36, 64, DEFAULT_APPEARANCE.pillHeight),
         opacity: clampNumber(raw.opacity, 0.5, 1, DEFAULT_APPEARANCE.opacity),
       }
     }

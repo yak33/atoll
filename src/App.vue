@@ -36,11 +36,12 @@ import IslandPill from './components/IslandPill.vue'
 import ExpandedPanel from './components/ExpandedPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 
-/** 药丸态窗口尺寸跟随用户自定义的胶囊大小 */
+/** 药丸高度固定 44px(试过做成可调,收益低且和文字排版耦合),宽度跟随用户自定义 */
+const PILL_HEIGHT = 44
 const SETTINGS_SIZE = new LogicalSize(340, 700)
 
 function pillSize(): LogicalSize {
-  return new LogicalSize(appearance.value.pillWidth, appearance.value.pillHeight)
+  return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT)
 }
 
 /** 展开态宽度至少 400,胶囊更长时跟随胶囊,避免展开反而比药丸窄 */

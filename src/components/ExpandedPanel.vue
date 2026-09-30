@@ -87,7 +87,6 @@ function urgentOf(iso: string | null): boolean {
     <div class="panel-header" title="按住任意位置拖动">
       <span class="plan">{{ planLevel || '未知套餐' }}</span>
       <span v-if="source === 'credit_limit'" class="credit-badge" title="该套餐仅上报信用额度,与 token 窗口度量不同">信用额度</span>
-      <span class="drag-hint">⠿</span>
     </div>
 
     <div v-if="windows.length === 0" class="no-data">暂无窗口数据</div>
@@ -157,12 +156,6 @@ function urgentOf(iso: string | null): boolean {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.drag-hint {
-  color: var(--text-muted);
-  font-size: 11px;
-  opacity: 0.7;
 }
 
 .plan {

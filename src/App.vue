@@ -83,12 +83,13 @@ async function handleAppearance(next: AppearanceSettings): Promise<void> {
   }
 }
 
-/** 展开面板标题行拖动:交给系统移动窗口,松手后记录并持久化新位置 */
+/** 展开面板拖动:交给系统移动窗口,结束后记录并持久化新位置。
+ *  mouseup 监听必须挂在 startDragging 之前——Windows 拖动是模态循环,
+ *  等 await 返回时 mouseup 可能已经错过;await 之后再兜底读一次位置,
+ *  两条路径殊途同归(谁后执行谁写入最终值)。 */
 async function handleDragStart(): Promise<void> {
   cancelCollapse()
-  await getCurrentWindow().startDragging()
-  const onMouseUp = () => {
-    document.removeEventListener('mouseup', onMouseUp)
+  const persistPosition = () => {
     void getCurrentWindow()
       .outerPosition()
       .then((pos) => {
@@ -99,7 +100,9 @@ async function handleDragStart(): Promise<void> {
         // 位置持久化失败仅影响下次启动的落位,本次会话内存锚点仍生效
       })
   }
-  document.addEventListener('mouseup', onMouseUp)
+  document.addEventListener('mouseup', persistPosition, { once: true })
+  await getCurrentWindow().startDragging()
+  persistPosition()
 }
 
 /** 设置面板「重置位置」:清锚点并回到顶部居中 */

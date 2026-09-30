@@ -135,6 +135,20 @@ function handleSave() {
   overflow-y: auto;
 }
 
+/* 细窄暗色滚动条,替代 WebView 默认的白色粗滚动条 */
+.panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;

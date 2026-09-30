@@ -84,8 +84,10 @@ function urgentOf(iso: string | null): boolean {
   flex-direction: column;
   gap: 10px;
   box-sizing: border-box;
-  /* 100vh 而非 100%:根组件的父级是 body(无高度),百分比会退化成内容高度 */
-  height: 100vh;
+  /* 高度由内容决定:内容恒小于窗口高度,不会被窗口裁切;
+     窗口多出的部分是透明区不可见。若改为 100vh 会在内容与底栏之间
+     露出一段面板背景空白 */
+  height: auto;
   padding: 14px 16px 12px;
   border-radius: 16px;
   background: var(--bg-panel);

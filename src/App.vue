@@ -92,7 +92,7 @@ async function handleDragStart(): Promise<void> {
   await getCurrentWindow().startDragging()
 }
 
-/** 设置面板「重置位置」:清锚点并回到顶部居中 */
+/** 设置面板「重置位置」:清锚点并立即回到顶部居中(设置态下移动设置窗口本身) */
 async function handleResetPosition(): Promise<void> {
   lastPersistedPos = null
   try {
@@ -100,9 +100,8 @@ async function handleResetPosition(): Promise<void> {
   } catch {
     // 清理失败不影响本次会话回落
   }
-  if (mode.value !== 'settings') {
-    await applyInitialLayout(pillSize(), null)
-  }
+  const size = mode.value === 'settings' ? SETTINGS_SIZE : pillSize()
+  await applyInitialLayout(size, null)
 }
 
 let collapseTimer: number | null = null
@@ -366,6 +365,7 @@ const tooltipText = computed<string>(() => {
     @close="closeSettings"
     @appearance="handleAppearance"
     @reset-position="handleResetPosition"
+    @dragstart="handleDragStart"
   />
 </template>
 

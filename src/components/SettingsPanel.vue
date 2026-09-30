@@ -28,8 +28,37 @@ const emit = defineEmits<{
   save: [credential: ZhipuCredential]
   appearance: [settings: AppearanceSettings]
   resetPosition: []
+  dragstart: []
   close: []
 }>()
+
+// ===== 整面板拖动(与展开面板同款):按钮/输入框/标签上按下不参与,
+// 避免选中文本、点控件被误判成拖窗 =====
+const DRAG_THRESHOLD_PX = 4
+let armed = false
+let downX = 0
+let downY = 0
+
+function onPanelMouseDown(event: MouseEvent): void {
+  if (event.button !== 0) return
+  if ((event.target as HTMLElement).closest('button, input, textarea, label') !== null) return
+  armed = true
+  downX = event.clientX
+  downY = event.clientY
+}
+
+function onPanelMouseMove(event: MouseEvent): void {
+  if (!armed) return
+  const moved = Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY)
+  if (moved > DRAG_THRESHOLD_PX) {
+    armed = false
+    emit('dragstart')
+  }
+}
+
+function onPanelMouseUp(): void {
+  armed = false
+}
 
 const DEFAULT_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
 
@@ -152,7 +181,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="panel">
+  <div
+    class="panel"
+    @mousedown="onPanelMouseDown"
+    @mousemove="onPanelMouseMove"
+    @mouseup="onPanelMouseUp"
+  >
     <div class="header">
       <span class="title">atoll 设置</span>
       <button class="close-btn" type="button" @click="emit('close')">✕</button>
@@ -260,6 +294,16 @@ onBeforeUnmount(() => {
   user-select: none;
   opacity: var(--widget-opacity);
   overflow-y: auto;
+  cursor: grab;
+}
+
+.panel:active {
+  cursor: grabbing;
+}
+
+/* 可交互元素保持自己的光标语义 */
+.input {
+  cursor: text;
 }
 
 /* 细窄暗色滚动条,替代 WebView 默认的白色粗滚动条;浅色主题下改为深色 thumb */

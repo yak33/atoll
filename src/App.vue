@@ -75,6 +75,8 @@ let lastPersistedPos: PillPosition | null = null
 
 function applyOpacityVar(): void {
   document.documentElement.style.setProperty('--bg-alpha', String(appearance.value.opacity))
+  // 光效强度同样走 CSS 变量,组件里按 calc 乘出最终透明度
+  document.documentElement.style.setProperty('--glow-strength', String(appearance.value.glowStrength))
 }
 
 async function handleAppearance(next: AppearanceSettings): Promise<void> {
@@ -337,6 +339,8 @@ const tooltipText = computed<string>(() => {
     :text="pillText"
     :has-error="quotaError !== null"
     :tooltip="tooltipText"
+    :glow-effects="appearance.glowEffects"
+    :glow-strength="appearance.glowStrength"
     @click="openSettings"
     @mouseenter="handlePillHover"
   />
@@ -385,8 +389,9 @@ const tooltipText = computed<string>(() => {
   --divider: rgba(255, 255, 255, 0.08); /* 分隔线 */
   --surface-overlay: rgba(255, 255, 255, 0.06); /* 状态条/输入框底 */
   --btn-bg: rgba(255, 255, 255, 0.08); /* 次级按钮 */
-  --island-sheen: rgba(255, 255, 255, 0.22); /* 药丸偶发动效:波纹/扫光 */
-  --island-sheen-strong: rgba(255, 255, 255, 0.55); /* 药丸偶发动效:边框流光 */
+  --sheen-rgb: 255 255 255; /* 药丸偶发光效基色(深色主题用白光) */
+  --sheen-base: 0.55; /* 满强度时的流光 alpha;波纹/扫光在此基础上 ×0.4,再乘用户强度 --glow-strength */
+  --glow-strength: 1; /* 由设置面板实时写入 */
 }
 
 html[data-theme='light'] {
@@ -400,8 +405,8 @@ html[data-theme='light'] {
   --divider: rgba(9, 9, 11, 0.08);
   --surface-overlay: rgba(9, 9, 11, 0.05);
   --btn-bg: rgba(9, 9, 11, 0.06);
-  --island-sheen: rgba(9, 9, 11, 0.14);
-  --island-sheen-strong: rgba(9, 9, 11, 0.4);
+  --sheen-rgb: 9 9 11;
+  --sheen-base: 0.4;
 }
 
 /* 窗口透明,页面本体不能有背景色,否则整个矩形会显形 */

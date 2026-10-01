@@ -9,6 +9,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { UsageWindow } from '../types'
+import type { GlowEffect } from '../core/appSettings'
 import { formatReset, resetUrgent } from '../composables/nowTick'
 
 const props = defineProps<{
@@ -17,6 +18,10 @@ const props = defineProps<{
   text: string
   hasError: boolean
   tooltip: string
+  /** 偶发光效种类(设置面板可配);空数组 = 不播放 */
+  glowEffects: GlowEffect[]
+  /** 光效强度系数 0.2-1,由 --glow-strength 乘进颜色透明度 */
+  glowStrength: number
 }>()
 
 const emit = defineEmits<{ click: []; mouseenter: [] }>()
@@ -48,19 +53,21 @@ const resetHighlight = computed<boolean>(() => {
 })
 
 // ===== 偶发随机光效 =====
-// 动作池:边框流光 / 波纹 / 扫光;随机间隔 8~18s 触发一次,不连续重复同一个。
+// 动作池来自设置面板的光效种类勾选;随机间隔 8~18s 触发一次,不连续重复同一个。
 // 光效全部绘制在药丸内部(::before/::after + inset:0),窗口与药丸等大零余量,任何越界位移/缩放都会被裁掉。
 
-const ACTIONS = ['flow', 'ripple', 'sweep'] as const
-const actionName = ref<'' | (typeof ACTIONS)[number]>('')
+const actionName = ref<GlowEffect | ''>('')
 let nextActionTimer = 0
 let clearActionTimer = 0
-let lastAction = ''
+let lastAction: GlowEffect | '' = ''
 
-function playRandomAction(): void {
-  let next = ACTIONS[Math.floor(Math.random() * ACTIONS.length)]
-  while (next === lastAction) {
-    next = ACTIONS[Math.floor(Math.random() * ACTIONS.length)]
+function playRandomAction(pool: GlowEffect[]): void {
+  let next = pool[Math.floor(Math.random() * pool.length)]
+  // 池子只剩一种时无从避开,直接重播同一种
+  if (pool.length > 1) {
+    while (next === lastAction) {
+      next = pool[Math.floor(Math.random() * pool.length)]
+    }
   }
   lastAction = next
   actionName.value = next
@@ -70,18 +77,18 @@ function playRandomAction(): void {
   }, 1500)
 }
 
-function scheduleNextAction(delayMs: number): void {
+function scheduleNextAction(pool: GlowEffect[], delayMs: number): void {
   nextActionTimer = window.setTimeout(() => {
-    playRandomAction()
-    scheduleNextAction(8000 + Math.random() * 10000)
+    playRandomAction(pool)
+    scheduleNextAction(pool, 8000 + Math.random() * 10000)
   }, delayMs)
 }
 
 onMounted(() => {
-  // 系统开启「减少动态效果」时不启动触发器,偶发光效一并静默
+  // 池子非空且系统未开「减少动态效果」才启动触发器
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (!reduceMotion) {
-    scheduleNextAction(6000 + Math.random() * 6000)
+  if (props.glowEffects.length > 0 && !reduceMotion) {
+    scheduleNextAction([...props.glowEffects], 6000 + Math.random() * 6000)
   }
 })
 
@@ -179,13 +186,14 @@ onBeforeUnmount(() => {
 }
 
 /* 边框流动发光:一段高光沿圆角边缘扫一圈。
-   mask 挖掉 content-box,只留 1.5px 的边框环;--flow-angle 由 @property 注册后可参与动画 */
+   mask 挖掉 content-box,只留 1.5px 的边框环;--flow-angle 由 @property 注册后可参与动画。
+   颜色 = 主题基色 × 满强度 alpha × 用户强度(--glow-strength 由设置面板实时写入) */
 .island::before {
   padding: 1.5px;
   background: conic-gradient(
     from var(--flow-angle),
     transparent 0deg 240deg,
-    var(--island-sheen-strong) 305deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 305deg,
     transparent 360deg
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -210,9 +218,14 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 波纹:从左端圆头扩散一层柔光后消散(background-size 在盒内缩放,不越界) */
+/* 波纹:从左端圆头扩散一层柔光后消散(background-size 在盒内缩放,不越界);
+   波纹/扫光比流光淡一档(×0.4) */
 .island.do-ripple::after {
-  background: radial-gradient(circle at 12% 50%, var(--island-sheen) 0%, transparent 55%);
+  background: radial-gradient(
+    circle at 12% 50%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%,
+    transparent 55%
+  );
   background-repeat: no-repeat;
   background-size: 0% 100%;
   animation: island-ripple 1.1s ease-out;
@@ -231,7 +244,12 @@ onBeforeUnmount(() => {
 
 /* 扫光:一道斜向高光从右向左横扫 */
 .island.do-sweep::after {
-  background: linear-gradient(105deg, transparent 40%, var(--island-sheen) 50%, transparent 60%);
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 50%,
+    transparent 60%
+  );
   background-repeat: no-repeat;
   background-size: 260% 100%;
   animation: island-sweep 1s ease-in-out;

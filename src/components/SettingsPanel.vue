@@ -15,6 +15,7 @@ import {
   saveTheme,
   DEFAULT_APPEARANCE,
   type AppearanceSettings,
+  type GlowEffect,
   type ThemeMode,
 } from '../core/appSettings'
 import { setThemeMode } from '../core/theme'
@@ -83,10 +84,29 @@ const themeMode = ref<ThemeMode>('auto')
 // 外观自定义:拖动实时预览(emit 给 App),松手落盘
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
+// 光效种类:多选按钮组文案(顺序即展示顺序)
+const GLOW_LABELS: { value: GlowEffect; label: string }[] = [
+  { value: 'flow', label: '边框流光' },
+  { value: 'ripple', label: '波纹' },
+  { value: 'sweep', label: '扫光' },
+]
+
 function applyAppearance(): void {
   // 不透明度直接在这里写 CSS 变量:单跳直达,不依赖跨组件事件链的完整性
   document.documentElement.style.setProperty('--bg-alpha', String(appearance.value.opacity))
+  // 光效强度同理;种类由 App 传给药丸组件,收回药丸后生效
+  document.documentElement.style.setProperty('--glow-strength', String(appearance.value.glowStrength))
   emit('appearance', { ...appearance.value })
+}
+
+/** 切换一种光效:选中则加入池子,取消则移出(全部取消 = 关闭偶发光效) */
+function toggleGlow(effect: GlowEffect): void {
+  const pool = appearance.value.glowEffects
+  appearance.value.glowEffects = pool.includes(effect)
+    ? pool.filter((item) => item !== effect)
+    : [...pool, effect]
+  applyAppearance()
+  commitAppearance()
 }
 
 async function commitAppearance(): Promise<void> {
@@ -265,6 +285,41 @@ onBeforeUnmount(() => {
         />
       </div>
       <span class="field-hint">长度在收回药丸后生效;拖动展开面板标题行可移动位置</span>
+
+      <div class="slider-head">
+        <span class="field-label">偶发光效</span>
+        <span class="slider-value">{{ appearance.glowEffects.length === 0 ? '关闭' : `${appearance.glowEffects.length} 种` }}</span>
+      </div>
+      <div class="theme-row">
+        <button
+          v-for="option in GLOW_LABELS"
+          :key="option.value"
+          :class="['theme-btn', appearance.glowEffects.includes(option.value) ? 'theme-btn-active' : '']"
+          type="button"
+          @click="toggleGlow(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">光效强度</span>
+          <span class="slider-value">{{ Math.round(appearance.glowStrength * 100) }}%</span>
+        </div>
+        <input
+          v-model.number="appearance.glowStrength"
+          type="range"
+          class="slider"
+          min="0.2"
+          max="1"
+          step="0.05"
+          @input="applyAppearance"
+          @change="commitAppearance"
+        />
+      </div>
+      <span class="field-hint">种类与强度在收回药丸后生效;每次随机间隔 8~18 秒播放一种</span>
+
       <button class="reset-pos-btn" type="button" @click="emit('resetPosition')">重置窗口位置(回到顶部居中)</button>
 
       <div class="section-title">系统</div>

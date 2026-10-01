@@ -15,15 +15,24 @@ const THEME_KEY = 'theme'
 /** 主题模式:auto = 跟随 Windows 系统深浅色 */
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
-/** 外观自定义:胶囊长度与整体不透明度(读写都会做范围钳制);高度固定不走配置 */
+/** 药丸偶发光效种类(全不选 = 关闭) */
+export type GlowEffect = 'flow' | 'ripple' | 'sweep'
+
+export const GLOW_EFFECTS: GlowEffect[] = ['flow', 'ripple', 'sweep']
+
+/** 外观自定义:胶囊长度、整体不透明度、偶发光效(读写都会做范围钳制);高度固定不走配置 */
 export interface AppearanceSettings {
   pillWidth: number // 180-420,逻辑像素
   opacity: number // 0.5-1
+  glowEffects: GlowEffect[] // 偶发光效种类子集
+  glowStrength: number // 0.2-1,光效强度系数
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   pillWidth: 260,
   opacity: 1,
+  glowEffects: [...GLOW_EFFECTS],
+  glowStrength: 1,
 }
 
 // 模块级单例:多处 load 同一文件会报资源占用
@@ -88,9 +97,14 @@ export async function loadAppearance(): Promise<AppearanceSettings> {
     const store = await getStore()
     const raw = await store.get<Partial<AppearanceSettings>>(APPEARANCE_KEY)
     if (raw !== null && typeof raw === 'object') {
+      // 光效种类:只保留合法值,去重;旧数据无此字段回落全开
+      const rawEffects = Array.isArray(raw.glowEffects) ? raw.glowEffects : GLOW_EFFECTS
+      const glowEffects = GLOW_EFFECTS.filter((effect) => rawEffects.includes(effect))
       return {
         pillWidth: clampNumber(raw.pillWidth, 180, 420, DEFAULT_APPEARANCE.pillWidth),
         opacity: clampNumber(raw.opacity, 0.5, 1, DEFAULT_APPEARANCE.opacity),
+        glowEffects,
+        glowStrength: clampNumber(raw.glowStrength, 0.2, 1, DEFAULT_APPEARANCE.glowStrength),
       }
     }
   } catch {

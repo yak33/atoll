@@ -8,3 +8,4 @@ src-tauri/icons/android/
 src-tauri/icons/ios/
 dev.log
 dev-launcher.cmd
+.vercel/

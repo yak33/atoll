@@ -133,14 +133,20 @@ const pomoView = computed(() => ({
     : pomo.value.remainMs === durationOf(pomo.value)
       ? '未开始'
       : '已暂停',
+  workMin: Math.round(pomo.value.workMs / 60_000),
+  breakMin: Math.round(pomo.value.breakMs / 60_000),
 }))
 
 let pomoTimer = 0
+/** 上次番茄 tick 时刻:供睡眠跳变检测;start/重置时归零防误判 */
+let lastPomoTickAt = 0
 
 function handlePomoToggle(): void {
   const now = Date.now()
   pomo.value = pomo.value.running ? pause(pomo.value, now) : startPomodoro(pomo.value, now)
   pomoNow.value = now
+  // 重新开始计时:基点重置,避免暂停间隔被误判为系统休眠
+  lastPomoTickAt = now
 }
 
 function handlePomoReset(): void {
@@ -252,10 +258,20 @@ onMounted(async () => {
     }
   })
 
-  // 番茄钟:常驻 1s 刷新,未运行时早退;阶段切换在此检测并发 toast
+  // 番茄钟:常驻 1s 刷新,未运行时早退;阶段切换在此检测并发 toast。
+  // 睡眠/休眠检测:tick 间隔跳变超过 2 分钟判定系统中断,冻结在断点前剩余并暂停
+  // (普通窗口隐藏的 WebView 节流 ≤60s,不会误判);恢复后用户手动继续。
   pomoTimer = window.setInterval(() => {
     if (!pomo.value.running) return
-    pomoNow.value = Date.now()
+    const now = Date.now()
+    if (lastPomoTickAt !== 0 && now - lastPomoTickAt > 120_000) {
+      pomo.value = pause(pomo.value, lastPomoTickAt)
+      void sendToast('⏸️ 检测到系统休眠,番茄钟已暂停,回来后点开始继续')
+      lastPomoTickAt = now
+      return
+    }
+    lastPomoTickAt = now
+    pomoNow.value = now
     const result = tickPomodoro(pomo.value, pomoNow.value)
     if (result.completed !== null) {
       pomo.value = result.state
@@ -286,7 +302,7 @@ async function enterMode(target: IslandMode): Promise<void> {
   const anchor = await resizeInPlace(size)
   if (anchor === null) return
   const pos = { x: anchor.x, y: anchor.y }
-  if (JSON.stringify(pos) !== JSON.stringify(lastPersistedPos)) {
+  if (lastPersistedPos === null || pos.x !== lastPersistedPos.x || pos.y !== lastPersistedPos.y) {
     lastPersistedPos = pos
     try {
       await savePillPosition(pos)
@@ -617,6 +633,7 @@ html[data-theme='light'] {
   animation: island-flow 2.2s linear;
 }
 
+// 这里使用 @property 注册 CSS 自定义属性,是因为 conic-gradient 的角度变量需要参与动画
 @property --flow-angle {
   syntax: '<angle>';
   initial-value: 0deg;

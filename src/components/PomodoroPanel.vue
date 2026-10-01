@@ -7,8 +7,15 @@
  * @author ZHANGCHAO 2026/10/01
  */
 defineProps<{
-  /** 阶段/剩余文本由 App 按秒算好传入;stateText:未开始/已暂停/空串(运行中) */
-  pomo: { phase: 'work' | 'break'; running: boolean; remainText: string; stateText: string }
+  /** 阶段/剩余文本由 App 按秒算好传入;workMin/breakMin 供提示文案插值 */
+  pomo: {
+    phase: 'work' | 'break'
+    running: boolean
+    remainText: string
+    stateText: string
+    workMin: number
+    breakMin: number
+  }
   activeModule: 'usage' | 'pomodoro'
 }>()
 
@@ -76,7 +83,7 @@ function onPanelMouseUp(): void {
       <button class="pomo-btn" type="button" @click="emit('pomoReset')">重置</button>
     </div>
 
-    <div class="pomo-hint">工作 25 分钟 · 休息 5 分钟,阶段结束自动切换并通知</div>
+    <div class="pomo-hint">工作 {{ pomo.workMin }} 分钟 · 休息 {{ pomo.breakMin }} 分钟,阶段结束自动切换并通知</div>
   </div>
 </template>
 

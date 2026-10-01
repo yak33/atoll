@@ -313,99 +313,99 @@ onBeforeUnmount(() => {
     </template>
 
     <!-- ===== 公共区:外观 / 胶囊 / 系统 ===== -->
-      <div class="section-title">外观</div>
-      <div class="theme-row">
-        <button
-          v-for="option in THEME_OPTIONS"
-          :key="option.value"
-          :class="['theme-btn', themeMode === option.value ? 'theme-btn-active' : '']"
-          type="button"
-          @click="handleTheme(option.value)"
-        >
-          {{ option.label }}
-        </button>
-      </div>
+    <div class="section-title">外观</div>
+    <div class="theme-row">
+      <button
+        v-for="option in THEME_OPTIONS"
+        :key="option.value"
+        :class="['theme-btn', themeMode === option.value ? 'theme-btn-active' : '']"
+        type="button"
+        @click="handleTheme(option.value)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
 
-      <div class="slider-field">
-        <div class="slider-head">
-          <span class="field-label">不透明度</span>
-          <span class="slider-value">{{ Math.round(appearance.opacity * 100) }}%</span>
-        </div>
-        <input
-          v-model.number="appearance.opacity"
-          type="range"
-          class="slider"
-          min="0.5"
-          max="1"
-          step="0.05"
-          @input="applyAppearance"
-          @change="commitAppearance"
-        />
-      </div>
-
-      <div class="section-title">胶囊</div>
-      <div class="slider-field">
-        <div class="slider-head">
-          <span class="field-label">长度</span>
-          <span class="slider-value">{{ appearance.pillWidth }}px</span>
-        </div>
-        <input
-          v-model.number="appearance.pillWidth"
-          type="range"
-          class="slider"
-          min="180"
-          max="420"
-          step="10"
-          @input="applyAppearance"
-          @change="commitAppearance"
-        />
-      </div>
-      <span class="field-hint">长度在收回药丸后生效;拖动展开面板标题行可移动位置</span>
-
+    <div class="slider-field">
       <div class="slider-head">
-        <span class="field-label">偶发光效</span>
-        <span class="slider-value">{{ appearance.glowEffects.length === 0 ? '关闭' : `${appearance.glowEffects.length} 种` }}</span>
+        <span class="field-label">不透明度</span>
+        <span class="slider-value">{{ Math.round(appearance.opacity * 100) }}%</span>
       </div>
-      <div class="theme-row">
-        <button
-          v-for="option in GLOW_LABELS"
-          :key="option.value"
-          :class="['theme-btn', appearance.glowEffects.includes(option.value) ? 'theme-btn-active' : '']"
-          type="button"
-          @click="toggleGlow(option.value)"
-        >
-          {{ option.label }}
-        </button>
+      <input
+        v-model.number="appearance.opacity"
+        type="range"
+        class="slider"
+        min="0.5"
+        max="1"
+        step="0.05"
+        @input="applyAppearance"
+        @change="commitAppearance"
+      />
+    </div>
+
+    <div class="section-title">胶囊</div>
+    <div class="slider-field">
+      <div class="slider-head">
+        <span class="field-label">长度</span>
+        <span class="slider-value">{{ appearance.pillWidth }}px</span>
       </div>
+      <input
+        v-model.number="appearance.pillWidth"
+        type="range"
+        class="slider"
+        min="180"
+        max="420"
+        step="10"
+        @input="applyAppearance"
+        @change="commitAppearance"
+      />
+    </div>
+    <span class="field-hint">长度在收回药丸后生效;拖动展开面板标题行可移动位置</span>
 
-      <div class="slider-field">
-        <div class="slider-head">
-          <span class="field-label">光效强度</span>
-          <span class="slider-value">{{ Math.round(appearance.glowStrength * 100) }}%</span>
-        </div>
-        <input
-          v-model.number="appearance.glowStrength"
-          type="range"
-          class="slider"
-          min="0.2"
-          max="1"
-          step="0.05"
-          @input="applyAppearance"
-          @change="commitAppearance"
-        />
+    <div class="slider-head">
+      <span class="field-label">偶发光效</span>
+      <span class="slider-value">{{ appearance.glowEffects.length === 0 ? '关闭' : `${appearance.glowEffects.length} 种` }}</span>
+    </div>
+    <div class="theme-row">
+      <button
+        v-for="option in GLOW_LABELS"
+        :key="option.value"
+        :class="['theme-btn', appearance.glowEffects.includes(option.value) ? 'theme-btn-active' : '']"
+        type="button"
+        @click="toggleGlow(option.value)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+
+    <div class="slider-field">
+      <div class="slider-head">
+        <span class="field-label">光效强度</span>
+        <span class="slider-value">{{ Math.round(appearance.glowStrength * 100) }}%</span>
       </div>
-      <span class="field-hint">种类与强度在收回药丸后生效;每次随机间隔 8~18 秒播放一种</span>
+      <input
+        v-model.number="appearance.glowStrength"
+        type="range"
+        class="slider"
+        min="0.2"
+        max="1"
+        step="0.05"
+        @input="applyAppearance"
+        @change="commitAppearance"
+      />
+    </div>
+    <span class="field-hint">种类与强度在收回药丸后生效;每次随机间隔 8~18 秒播放一种</span>
 
-      <button class="reset-pos-btn" type="button" @click="emit('resetPosition')">重置窗口位置(回到顶部居中)</button>
+    <button class="reset-pos-btn" type="button" @click="emit('resetPosition')">重置窗口位置(回到顶部居中)</button>
 
-      <div class="section-title">系统</div>
-      <label class="toggle-row">
-        <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
-        <span class="field-label">开机自动启动</span>
-      </label>
+    <div class="section-title">系统</div>
+    <label class="toggle-row">
+      <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
+      <span class="field-label">开机自动启动</span>
+    </label>
 
-      <!-- 状态反馈:仅在有事发生时出现(自动保存成功/凭据为空阻断),平时不占视觉 -->
-      <div v-if="savedAtText !== ''" class="autosave-status">{{ savedAtText }}</div>
+    <!-- 状态反馈:仅在有事发生时出现(自动保存成功/凭据为空阻断),平时不占视觉 -->
+    <div v-if="savedAtText !== ''" class="autosave-status">{{ savedAtText }}</div>
   </div>
 </template>
 

@@ -19,13 +19,9 @@ export function useGlowEffects(pool: () => GlowEffect[]): { actionName: Ref<Glow
   function playRandomAction(): void {
     const current = pool()
     if (current.length === 0) return
-    let next = current[Math.floor(Math.random() * current.length)]
-    // 池子只剩一种时无从避开,直接重播同一种
-    if (current.length > 1) {
-      while (next === lastAction) {
-        next = current[Math.floor(Math.random() * current.length)]
-      }
-    }
+    // 先过滤掉上一次的动作再随机取:不依赖上游对池子去重的保证
+    const candidates = current.length > 1 ? current.filter((effect) => effect !== lastAction) : current
+    const next = candidates[Math.floor(Math.random() * candidates.length)]
     lastAction = next
     actionName.value = next
     // 2300ms 大于最长动画时长(flow/dual 2.2s),到点摘 class 复位

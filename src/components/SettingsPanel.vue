@@ -89,6 +89,9 @@ const GLOW_LABELS: { value: GlowEffect; label: string }[] = [
   { value: 'flow', label: '边框流光' },
   { value: 'ripple', label: '波纹' },
   { value: 'sweep', label: '扫光' },
+  { value: 'dual', label: '双流光' },
+  { value: 'twin', label: '双波汇流' },
+  { value: 'sparkle', label: '星火' },
 ]
 
 function applyAppearance(): void {
@@ -376,14 +379,15 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 
-/* 主题三选一分段控件 */
+/* 分段控件/多选按钮组:可换行,每行最多三个 */
 .theme-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .theme-btn {
-  flex: 1;
+  flex: 1 0 30%;
   height: 26px;
   border: 1px solid var(--border-soft);
   border-radius: 8px;
@@ -393,6 +397,7 @@ onBeforeUnmount(() => {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .theme-btn:hover {

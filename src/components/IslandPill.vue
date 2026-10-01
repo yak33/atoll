@@ -266,6 +266,58 @@ onBeforeUnmount(() => {
   }
 }
 
+/* 双流光:两段高光相隔 180°,共用 --flow-angle 旋转动画同时绕行 */
+.island.do-dual::before {
+  opacity: 1;
+  background: conic-gradient(
+    from var(--flow-angle),
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0deg 30deg,
+    transparent 60deg 180deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 210deg 240deg,
+    transparent 270deg
+  );
+  animation: island-flow 1.4s linear;
+}
+
+/* 双波汇流:两端圆头同时泛光,向中间汇合;复用波纹的扩散 keyframes */
+.island.do-twin::after {
+  background:
+    radial-gradient(circle at 6% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%),
+    radial-gradient(circle at 94% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%);
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  animation: island-ripple 1.2s ease-out;
+}
+
+/* 星火:三个小光点分布在不同位置,整体透明度分段跳闪 */
+.island.do-sparkle::after {
+  background:
+    radial-gradient(circle 5px at 30% 38%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
+    radial-gradient(circle 3px at 55% 62%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
+    radial-gradient(circle 4px at 76% 34%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%);
+  background-repeat: no-repeat;
+  animation: island-sparkle 1.3s ease-in-out;
+}
+
+@keyframes island-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  30% {
+    opacity: 0.1;
+  }
+  45% {
+    opacity: 0.7;
+  }
+  62% {
+    opacity: 0;
+  }
+}
+
 /* 尊重系统「减少动态效果」:只保留静态呈现 */
 @media (prefers-reduced-motion: reduce) {
   .island::before,

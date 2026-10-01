@@ -16,9 +16,9 @@ const THEME_KEY = 'theme'
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
 /** 药丸偶发光效种类(全不选 = 关闭) */
-export type GlowEffect = 'flow' | 'ripple' | 'sweep'
+export type GlowEffect = 'flow' | 'ripple' | 'sweep' | 'dual' | 'twin' | 'sparkle'
 
-export const GLOW_EFFECTS: GlowEffect[] = ['flow', 'ripple', 'sweep']
+export const GLOW_EFFECTS: GlowEffect[] = ['flow', 'ripple', 'sweep', 'dual', 'twin', 'sparkle']
 
 /** 外观自定义:胶囊长度、整体不透明度、偶发光效(读写都会做范围钳制);高度固定不走配置 */
 export interface AppearanceSettings {

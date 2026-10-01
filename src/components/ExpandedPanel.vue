@@ -16,8 +16,8 @@ defineProps<{
   fetchedAgo: string
   error: QuotaError | null
   refreshing: boolean
-  /** 番茄钟(remainText 由 App 按秒算好传入,组件纯展示) */
-  pomo: { phase: 'work' | 'break'; running: boolean; remainText: string }
+  /** 当前模块:用量面板恒收 'usage',用于 Tab 高亮 */
+  activeModule: 'usage' | 'pomodoro'
 }>()
 
 const emit = defineEmits<{
@@ -26,8 +26,7 @@ const emit = defineEmits<{
   mouseenter: []
   mouseleave: []
   dragstart: []
-  pomoToggle: []
-  pomoReset: []
+  switchModule: [module: 'usage' | 'pomodoro']
 }>()
 
 // ===== 整面板拖动移动窗口:位移超过阈值才算拖动;按钮上按下不参与 =====
@@ -88,6 +87,11 @@ function urgentOf(iso: string | null): boolean {
     @mousemove="onPanelMouseMove"
     @mouseup="onPanelMouseUp"
   >
+    <div class="module-tabs">
+      <button :class="['tab-btn', activeModule === 'usage' ? 'tab-btn-active' : '']" type="button" @click="emit('switchModule', 'usage')">用量</button>
+      <button :class="['tab-btn', activeModule === 'pomodoro' ? 'tab-btn-active' : '']" type="button" @click="emit('switchModule', 'pomodoro')">番茄</button>
+    </div>
+
     <div class="panel-header" title="按住任意位置拖动">
       <span class="plan">{{ planLevel || '未知套餐' }}</span>
       <span v-if="source === 'credit_limit'" class="credit-badge" title="该套餐仅上报信用额度,与 token 窗口度量不同">信用额度</span>
@@ -102,14 +106,6 @@ function urgentOf(iso: string | null): boolean {
       </div>
       <span class="win-percent">{{ Math.round(win.usedPercent) }}%</span>
       <span :class="['win-reset', urgentOf(win.resetAt) ? 'win-reset-urgent' : '']">{{ resetTextOf(win.resetAt) || '-' }}</span>
-    </div>
-
-    <div class="pomo-row">
-      <span class="pomo-emoji" title="番茄钟">🍅</span>
-      <span class="pomo-phase">{{ pomo.phase === 'work' ? '专注' : '休息' }}</span>
-      <span :class="['pomo-clock', pomo.running ? '' : 'pomo-clock-idle']">{{ pomo.remainText }}</span>
-      <button class="pomo-btn" type="button" @click="emit('pomoToggle')">{{ pomo.running ? '暂停' : '开始' }}</button>
-      <button class="pomo-btn" type="button" @click="emit('pomoReset')">重置</button>
     </div>
 
     <div v-if="error" class="error-line" :title="error.message">{{ error.message }}</div>
@@ -248,53 +244,34 @@ function urgentOf(iso: string | null): boolean {
   font-weight: 700;
 }
 
-/* 番茄钟卡:与 win-row 同层,分隔线隔开 */
-.pomo-row {
+/* 模块 Tab:用量 | 番茄,当前项绿色高亮 */
+.module-tabs {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  border-top: 1px solid var(--divider);
-  padding-top: 8px;
+  gap: 4px;
+  margin-bottom: -2px;
 }
 
-.pomo-emoji {
-  font-size: 13px;
-}
-
-.pomo-phase {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.pomo-clock {
-  flex: 1;
-  font-size: 15px;
-  font-weight: 700;
-  color: #fb923c;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 未运行时倒计时弱化,提示这不是活数据 */
-.pomo-clock-idle {
-  color: var(--text-muted);
-}
-
-.pomo-btn {
-  height: 22px;
+.tab-btn {
+  height: 20px;
   padding: 0 10px;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--btn-bg);
-  color: var(--text-primary);
-  font-size: 11px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
 }
 
-.pomo-btn:hover {
-  background: var(--border-soft);
+.tab-btn:hover {
+  color: var(--text-secondary);
+}
+
+.tab-btn-active {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #4ade80;
 }
 
 .error-line {

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /**
- * 灵动岛药丸(收起态)。
+ * 用量监控药丸(收起态)。
  * 纯展示:最紧张窗口的进度条 + 倒计时 + 告警配色/脉冲。
- * 交互只有两个信号:click(打开设置)、mouseenter(请求展开)。
- * 附带偶发光效:每 8~18s 随机播放一次边框流光/波纹/扫光,定时器在本组件。
+ * 交互信号:click(打开设置)、mouseenter(请求展开)、wheel(容器切模块)。
+ * 药丸基座样式与偶发光效在 App.vue 全局(.island),本组件只有用量特有部分。
  *
  * @author ZHANGCHAO 2026/10/01
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import type { UsageWindow } from '../types'
 import type { GlowEffect } from '../core/appSettings'
+import { useGlowEffects } from '../composables/useGlowEffects'
 import { formatReset, resetUrgent } from '../composables/nowTick'
 
 const props = defineProps<{
@@ -18,15 +19,13 @@ const props = defineProps<{
   text: string
   hasError: boolean
   tooltip: string
-  /** 番茄钟摘要(运行中为「🍅 mm:ss」,非运行为空串) */
-  pomoText: string
   /** 偶发光效种类(设置面板可配);空数组 = 不播放 */
   glowEffects: GlowEffect[]
-  /** 光效强度系数 0.2-1,由 --glow-strength 乘进颜色透明度 */
-  glowStrength: number
 }>()
 
-const emit = defineEmits<{ click: []; mouseenter: [] }>()
+const emit = defineEmits<{ click: []; mouseenter: []; wheel: [] }>()
+
+const { actionName } = useGlowEffects(() => props.glowEffects)
 
 // 告警等级决定药丸本身的配色(PRD §4.3):>=90 红色脉冲,>=75 琥珀
 const alertClass = computed<string>(() => {
@@ -53,51 +52,6 @@ const resetHighlight = computed<boolean>(() => {
   if (props.win?.resetAt == null) return false
   return resetUrgent(props.win.resetAt)
 })
-
-// ===== 偶发随机光效 =====
-// 动作池来自设置面板的光效种类勾选;随机间隔 8~18s 触发一次,不连续重复同一个。
-// 光效全部绘制在药丸内部(::before/::after + inset:0),窗口与药丸等大零余量,任何越界位移/缩放都会被裁掉。
-
-const actionName = ref<GlowEffect | ''>('')
-let nextActionTimer = 0
-let clearActionTimer = 0
-let lastAction: GlowEffect | '' = ''
-
-function playRandomAction(pool: GlowEffect[]): void {
-  let next = pool[Math.floor(Math.random() * pool.length)]
-  // 池子只剩一种时无从避开,直接重播同一种
-  if (pool.length > 1) {
-    while (next === lastAction) {
-      next = pool[Math.floor(Math.random() * pool.length)]
-    }
-  }
-  lastAction = next
-  actionName.value = next
-  // 2300ms 大于最长动画时长(flow/dual 2.2s),到点摘 class 复位
-  clearActionTimer = window.setTimeout(() => {
-    actionName.value = ''
-  }, 2300)
-}
-
-function scheduleNextAction(pool: GlowEffect[], delayMs: number): void {
-  nextActionTimer = window.setTimeout(() => {
-    playRandomAction(pool)
-    scheduleNextAction(pool, 8000 + Math.random() * 10000)
-  }, delayMs)
-}
-
-onMounted(() => {
-  // 池子非空且系统未开「减少动态效果」才启动触发器
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (props.glowEffects.length > 0 && !reduceMotion) {
-    scheduleNextAction([...props.glowEffects], 6000 + Math.random() * 6000)
-  }
-})
-
-onBeforeUnmount(() => {
-  window.clearTimeout(nextActionTimer)
-  window.clearTimeout(clearActionTimer)
-})
 </script>
 
 <template>
@@ -106,6 +60,7 @@ onBeforeUnmount(() => {
     :title="tooltip"
     @click="emit('click')"
     @mouseenter="emit('mouseenter')"
+    @wheel.prevent="emit('wheel')"
   >
     <template v-if="win">
       <span class="label">{{ win.key === 'weekly' ? '7d' : '5h' }}</span>
@@ -118,33 +73,10 @@ onBeforeUnmount(() => {
       <span v-if="hasError" class="warn-dot">!</span>
     </template>
     <span v-else class="empty">{{ text || '--' }}</span>
-    <!-- 番茄钟摘要:与数据/占位并列,运行中才出现 -->
-    <span v-if="pomoText !== ''" class="pomo">{{ pomoText }}</span>
   </div>
 </template>
 
 <style scoped>
-.island {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  /* 100vh 而非 100%:根组件父级是 body(无高度),百分比会退化成内容高度,
-     药丸会缩成一行字高;窗口高度就是药丸高度,用视口高度撑满 */
-  height: 100vh;
-  padding: 0 14px;
-  box-sizing: border-box;
-  border-radius: 9999px;
-  background: var(--bg-surface);
-  border: 1px solid var(--pill-border);
-  color: var(--text-primary);
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  font-size: 12px;
-  user-select: none;
-  cursor: pointer;
-  transition: background 0.3s ease, border-color 0.3s ease;
-}
-
 /* 告警态:深色调底色两套主题通用,文字强制浅色保证对比度;
    背景同样跟随 --bg-alpha,与普通态透明度一致 */
 .island-amber {
@@ -173,161 +105,6 @@ onBeforeUnmount(() => {
   }
   50% {
     box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.25);
-  }
-}
-
-/* ===== 偶发随机光效(JS 每 8~18s 挂一次 do-* class,播放完摘除)=====
-   两个伪元素常驻透明:flow 用 ::before(边框环),ripple/sweep 共用 ::after */
-
-.island::before,
-.island::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-}
-
-/* 边框流动发光:一段高光沿圆角边缘扫一圈。
-   mask 挖掉 content-box,只留 1.5px 的边框环;--flow-angle 由 @property 注册后可参与动画。
-   颜色 = 主题基色 × 满强度 alpha × 用户强度(--glow-strength 由设置面板实时写入) */
-.island::before {
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--flow-angle),
-    transparent 0deg 240deg,
-    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 305deg,
-    transparent 360deg
-  );
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0);
-}
-
-.island.do-flow::before {
-  opacity: 1;
-  animation: island-flow 2.2s linear;
-}
-
-@property --flow-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes island-flow {
-  to {
-    --flow-angle: 360deg;
-  }
-}
-
-/* 波纹:从左端圆头扩散一层柔光后消散(background-size 在盒内缩放,不越界);
-   波纹/扫光比流光淡一档(×0.4) */
-.island.do-ripple::after {
-  background: radial-gradient(
-    circle at 12% 50%,
-    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%,
-    transparent 55%
-  );
-  background-repeat: no-repeat;
-  background-size: 0% 100%;
-  animation: island-ripple 1.7s ease-out;
-}
-
-@keyframes island-ripple {
-  0% {
-    background-size: 0% 100%;
-    opacity: 0.9;
-  }
-  100% {
-    background-size: 300% 100%;
-    opacity: 0;
-  }
-}
-
-/* 扫光:一道斜向高光从右向左横扫 */
-.island.do-sweep::after {
-  background: linear-gradient(
-    105deg,
-    transparent 40%,
-    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 50%,
-    transparent 60%
-  );
-  background-repeat: no-repeat;
-  background-size: 260% 100%;
-  animation: island-sweep 1.6s ease-in-out;
-}
-
-@keyframes island-sweep {
-  0% {
-    background-position: 120% 0;
-    opacity: 1;
-  }
-  100% {
-    background-position: -60% 0;
-    opacity: 1;
-  }
-}
-
-/* 双流光:两段高光相隔 180°,共用 --flow-angle 旋转动画同时绕行 */
-.island.do-dual::before {
-  opacity: 1;
-  background: conic-gradient(
-    from var(--flow-angle),
-    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0deg 30deg,
-    transparent 60deg 180deg,
-    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 210deg 240deg,
-    transparent 270deg
-  );
-  animation: island-flow 2.2s linear;
-}
-
-/* 双波汇流:两端圆头同时泛光,向中间汇合;复用波纹的扩散 keyframes */
-.island.do-twin::after {
-  background:
-    radial-gradient(circle at 6% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%),
-    radial-gradient(circle at 94% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%);
-  background-repeat: no-repeat;
-  background-size: 0% 100%;
-  animation: island-ripple 1.9s ease-out;
-}
-
-/* 星火:三个小光点分布在不同位置,整体透明度分段跳闪 */
-.island.do-sparkle::after {
-  background:
-    radial-gradient(circle 5px at 30% 38%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
-    radial-gradient(circle 3px at 55% 62%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
-    radial-gradient(circle 4px at 76% 34%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%);
-  background-repeat: no-repeat;
-  animation: island-sparkle 2s ease-in-out;
-}
-
-@keyframes island-sparkle {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.9;
-  }
-  30% {
-    opacity: 0.1;
-  }
-  45% {
-    opacity: 0.7;
-  }
-  62% {
-    opacity: 0;
-  }
-}
-
-/* 尊重系统「减少动态效果」:只保留静态呈现 */
-@media (prefers-reduced-motion: reduce) {
-  .island::before,
-  .island::after {
-    animation: none;
-    opacity: 0;
   }
 }
 
@@ -386,15 +163,6 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-weight: 700;
   color: #f59e0b;
-}
-
-/* 番茄钟摘要:番茄橙,与普通用量倒计时的弱化色区分 */
-.pomo {
-  font-size: 10px;
-  font-weight: 600;
-  color: #fb923c;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .empty {

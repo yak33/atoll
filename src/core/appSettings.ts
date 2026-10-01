@@ -11,6 +11,27 @@ import type { ZhipuCredential } from '../adapters/zhipu'
 const STORE_FILE = 'settings.json'
 const CREDENTIAL_KEY = 'zhipu_credential'
 const THEME_KEY = 'theme'
+const ACTIVE_MODULE_KEY = 'active_module'
+
+/** 当前激活的灵动岛模块:用量监控 / 番茄钟 */
+export type IslandModule = 'usage' | 'pomodoro'
+
+export async function loadActiveModule(): Promise<IslandModule> {
+  try {
+    const store = await getStore()
+    const value = await store.get<IslandModule>(ACTIVE_MODULE_KEY)
+    if (value === 'usage' || value === 'pomodoro') return value
+  } catch {
+    // 读取失败回落用量监控
+  }
+  return 'usage'
+}
+
+export async function saveActiveModule(module: IslandModule): Promise<void> {
+  const store = await getStore()
+  await store.set(ACTIVE_MODULE_KEY, module)
+  await store.save()
+}
 
 /** 主题模式:auto = 跟随 Windows 系统深浅色 */
 export type ThemeMode = 'auto' | 'light' | 'dark'

@@ -18,12 +18,15 @@ import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
 import {
   loadAppearance,
+  loadActiveModule,
   loadCredential,
   loadPillPosition,
   loadTheme,
+  saveActiveModule,
   saveCredential,
   savePillPosition,
   type AppearanceSettings,
+  type IslandModule,
   type PillPosition,
   DEFAULT_APPEARANCE,
 } from './core/appSettings'
@@ -36,6 +39,7 @@ import {
   formatClock,
   initialState as initialPomodoro,
   pause,
+  phaseDuration,
   remainOf,
   reset as resetPomodoro,
   start as startPomodoro,
@@ -46,6 +50,8 @@ import type { ZhipuCredential } from './adapters/zhipu'
 import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
 import IslandPill from './components/IslandPill.vue'
 import ExpandedPanel from './components/ExpandedPanel.vue'
+import PomodoroPill from './components/PomodoroPill.vue'
+import PomodoroPanel from './components/PomodoroPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 
 /** 药丸高度固定 44px(试过做成可调,收益低且和文字排版耦合),宽度跟随用户自定义 */
@@ -56,8 +62,9 @@ function pillSize(): LogicalSize {
   return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT)
 }
 
-/** 展开态宽度至少 400,胶囊更长时跟随胶囊,避免展开反而比药丸窄 */
+/** 展开态尺寸按模块:用量面板宽度至少 400 且跟随药丸,番茄面板内容少用固定小尺寸 */
 function expandedSize(): LogicalSize {
+  if (activeModule.value === 'pomodoro') return new LogicalSize(280, 250)
   return new LogicalSize(Math.max(400, appearance.value.pillWidth), 215)
 }
 /** 鼠标离开面板后延迟收回,防止误触抖动(PRD §4.2) */
@@ -78,6 +85,33 @@ let lastSnapshot: ZhipuQuotaSnapshot | null = null
 // 外观自定义:不透明度实时生效,胶囊尺寸在药丸态立即应用
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
+// ===== 模块层:用量监控 / 番茄钟,收起态滚轮切换,选择持久化 =====
+const activeModule = ref<IslandModule>('usage')
+
+async function handleSwitchModule(next: IslandModule): Promise<void> {
+  if (next === activeModule.value) return
+  activeModule.value = next
+  try {
+    await saveActiveModule(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+  // 展开态下两个面板尺寸不同,就地伸缩
+  if (mode.value === 'expanded') {
+    await resizeInPlace(expandedSize())
+  }
+}
+
+// 滚轮一次滚动会连发多个 wheel 事件,400ms 节流防止来回抖
+let lastWheelSwitch = 0
+
+function handlePillWheel(): void {
+  const now = Date.now()
+  if (now - lastWheelSwitch < 400) return
+  lastWheelSwitch = now
+  void handleSwitchModule(activeModule.value === 'usage' ? 'pomodoro' : 'usage')
+}
+
 // ===== 番茄钟 =====
 // 计时基于结束时间戳(见 core/pomodoro.ts 头注释):1s interval 只做显示刷新,
 // 窗口被隐藏导致节流也不影响剩余时间与阶段切换的正确性。
@@ -85,8 +119,18 @@ const pomo = ref(initialPomodoro())
 const pomoNow = ref(Date.now())
 
 const pomoClockText = computed(() => formatClock(remainOf(pomo.value, pomoNow.value)))
-/** 药丸收起态的番茄摘要:仅运行中显示,暂停/未开始不打扰 */
-const pillPomoText = computed(() => (pomo.value.running ? `🍅 ${pomoClockText.value}` : ''))
+
+/** 面板/药丸共用的番茄视图:stateText 区分未开始/已暂停/运行中(空串) */
+const pomoView = computed(() => ({
+  phase: pomo.value.phase,
+  running: pomo.value.running,
+  remainText: pomoClockText.value,
+  stateText: pomo.value.running
+    ? ''
+    : pomo.value.remainMs === phaseDuration(pomo.value.phase)
+      ? '未开始'
+      : '已暂停',
+}))
 
 let pomoTimer = 0
 
@@ -167,6 +211,7 @@ onMounted(async () => {
   // 主题与外观先行:避免首帧配色/尺寸跳变(index.html 默认 data-theme="dark")
   disposeTheme = initTheme(await loadTheme())
   appearance.value = await loadAppearance()
+  activeModule.value = await loadActiveModule()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -375,37 +420,55 @@ const tooltipText = computed<string>(() => {
 </script>
 
 <template>
-  <!-- 收起态:悬停展开,点击设置 -->
+  <!-- 收起态:按模块渲染药丸;滚轮切换模块,悬停展开,点击设置 -->
   <IslandPill
-    v-if="mode === 'pill'"
+    v-if="mode === 'pill' && activeModule === 'usage'"
     :win="primary"
     :text="pillText"
     :has-error="quotaError !== null"
     :tooltip="tooltipText"
-    :pomo-text="pillPomoText"
     :glow-effects="appearance.glowEffects"
-    :glow-strength="appearance.glowStrength"
     @click="openSettings"
     @mouseenter="handlePillHover"
+    @wheel="handlePillWheel"
+  />
+  <PomodoroPill
+    v-else-if="mode === 'pill'"
+    :pomo="pomoView"
+    :tooltip="'🍅 番茄钟 · 滚轮切回用量'"
+    :glow-effects="appearance.glowEffects"
+    @click="openSettings"
+    @mouseenter="handlePillHover"
+    @wheel="handlePillWheel"
   />
 
-  <!-- 展开态:悬停保持,离开 500ms 收回 -->
+  <!-- 展开态:按模块渲染面板,顶部 Tab 切换 -->
   <ExpandedPanel
-    v-else-if="mode === 'expanded'"
+    v-else-if="mode === 'expanded' && activeModule === 'usage'"
     :windows="snapshot?.windows ?? []"
     :plan-level="snapshot?.planLevel ?? ''"
     :source="snapshot?.source ?? 'tokens_limit'"
     :fetched-ago="fetchedAgoText"
     :error="quotaError"
     :refreshing="refreshing"
-    :pomo="{ phase: pomo.phase, running: pomo.running, remainText: pomoClockText }"
+    :active-module="activeModule"
     @refresh="handleRefresh"
     @settings="openSettings"
     @mouseenter="cancelCollapse"
     @mouseleave="scheduleCollapse"
     @dragstart="handleDragStart"
+    @switch-module="handleSwitchModule"
+  />
+  <PomodoroPanel
+    v-else-if="mode === 'expanded'"
+    :pomo="pomoView"
+    :active-module="activeModule"
+    @mouseenter="cancelCollapse"
+    @mouseleave="scheduleCollapse"
+    @dragstart="handleDragStart"
     @pomo-toggle="handlePomoToggle"
     @pomo-reset="handlePomoReset"
+    @switch-module="handleSwitchModule"
   />
 
   <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->
@@ -454,6 +517,181 @@ html[data-theme='light'] {
   --btn-bg: rgba(9, 9, 11, 0.06);
   --sheen-rgb: 9 9 11;
   --sheen-base: 0.4;
+}
+
+/* ===== 药丸基座(全局):用量/番茄两种药丸共用的容器外观 ===== */
+.island {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 100vh 而非 100%:根组件父级是 body(无高度),百分比会退化成内容高度,
+     药丸会缩成一行字高;窗口高度就是药丸高度,用视口高度撑满 */
+  height: 100vh;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--pill-border);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  user-select: none;
+  cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* ===== 偶发随机光效(全局):触发器在 useGlowEffects,种类在设置面板可配 =====
+   两个伪元素常驻透明:flow/dual 用 ::before(边框环),其余用 ::after(面光) */
+.island::before,
+.island::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* 边框环:mask 挖掉 content-box 只留 1.5px;--flow-angle 由 @property 注册后可参与动画。
+   颜色 = 主题基色 × 满强度 alpha × 用户强度(--glow-strength 由设置面板实时写入) */
+.island::before {
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--flow-angle),
+    transparent 0deg 240deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 305deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box exclude, linear-gradient(#fff 0 0);
+}
+
+.island.do-flow::before {
+  opacity: 1;
+  animation: island-flow 2.2s linear;
+}
+
+@property --flow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes island-flow {
+  to {
+    --flow-angle: 360deg;
+  }
+}
+
+/* 波纹:从左端圆头扩散一层柔光后消散(background-size 在盒内缩放,不越界);
+   波纹/扫光比流光淡一档(×0.4) */
+.island.do-ripple::after {
+  background: radial-gradient(
+    circle at 12% 50%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%,
+    transparent 55%
+  );
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  animation: island-ripple 1.7s ease-out;
+}
+
+@keyframes island-ripple {
+  0% {
+    background-size: 0% 100%;
+    opacity: 0.9;
+  }
+  100% {
+    background-size: 300% 100%;
+    opacity: 0;
+  }
+}
+
+/* 扫光:一道斜向高光从右向左横扫 */
+.island.do-sweep::after {
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 50%,
+    transparent 60%
+  );
+  background-repeat: no-repeat;
+  background-size: 260% 100%;
+  animation: island-sweep 1.6s ease-in-out;
+}
+
+@keyframes island-sweep {
+  0% {
+    background-position: 120% 0;
+    opacity: 1;
+  }
+  100% {
+    background-position: -60% 0;
+    opacity: 1;
+  }
+}
+
+/* 双流光:两段高光相隔 180°,共用 --flow-angle 旋转动画同时绕行 */
+.island.do-dual::before {
+  opacity: 1;
+  background: conic-gradient(
+    from var(--flow-angle),
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0deg 30deg,
+    transparent 60deg 180deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 210deg 240deg,
+    transparent 270deg
+  );
+  animation: island-flow 2.2s linear;
+}
+
+/* 双波汇流:两端圆头同时泛光,向中间汇合;复用波纹的扩散 keyframes */
+.island.do-twin::after {
+  background:
+    radial-gradient(circle at 6% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%),
+    radial-gradient(circle at 94% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%);
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  animation: island-ripple 1.9s ease-out;
+}
+
+/* 星火:三个小光点分布在不同位置,整体透明度分段跳闪 */
+.island.do-sparkle::after {
+  background:
+    radial-gradient(circle 5px at 30% 38%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
+    radial-gradient(circle 3px at 55% 62%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
+    radial-gradient(circle 4px at 76% 34%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%);
+  background-repeat: no-repeat;
+  animation: island-sparkle 2s ease-in-out;
+}
+
+@keyframes island-sparkle {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  30% {
+    opacity: 0.1;
+  }
+  45% {
+    opacity: 0.7;
+  }
+  62% {
+    opacity: 0;
+  }
+}
+
+/* 尊重系统「减少动态效果」:偶发光效静止 */
+@media (prefers-reduced-motion: reduce) {
+  .island::before,
+  .island::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 /* 窗口透明,页面本体不能有背景色,否则整个矩形会显形 */

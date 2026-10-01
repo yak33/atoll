@@ -331,7 +331,8 @@ onBeforeUnmount(() => {
         <span class="field-label">开机自动启动</span>
       </label>
 
-      <div class="autosave-status">{{ savedAtText || '更改即时保存' }}</div>
+      <!-- 状态反馈:仅在有事发生时出现(自动保存成功/凭据为空阻断),平时不占视觉 -->
+      <div v-if="savedAtText !== ''" class="autosave-status">{{ savedAtText }}</div>
     </div>
   </div>
 </template>
@@ -543,9 +544,8 @@ onBeforeUnmount(() => {
   padding-top: 10px;
 }
 
-/* 自动保存状态行:固定最小高度避免出现/消失时布局抖动 */
+/* 自动保存状态行:仅在有事发生时渲染 */
 .autosave-status {
-  min-height: 16px;
   margin-top: 8px;
   font-size: 10px;
   color: var(--text-muted);

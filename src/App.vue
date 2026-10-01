@@ -385,6 +385,8 @@ const tooltipText = computed<string>(() => {
   --divider: rgba(255, 255, 255, 0.08); /* 分隔线 */
   --surface-overlay: rgba(255, 255, 255, 0.06); /* 状态条/输入框底 */
   --btn-bg: rgba(255, 255, 255, 0.08); /* 次级按钮 */
+  --island-sheen: rgba(255, 255, 255, 0.22); /* 药丸偶发动效:波纹/扫光 */
+  --island-sheen-strong: rgba(255, 255, 255, 0.55); /* 药丸偶发动效:边框流光 */
 }
 
 html[data-theme='light'] {
@@ -398,6 +400,8 @@ html[data-theme='light'] {
   --divider: rgba(9, 9, 11, 0.08);
   --surface-overlay: rgba(9, 9, 11, 0.05);
   --btn-bg: rgba(9, 9, 11, 0.06);
+  --island-sheen: rgba(9, 9, 11, 0.14);
+  --island-sheen-strong: rgba(9, 9, 11, 0.4);
 }
 
 /* 窗口透明,页面本体不能有背景色,否则整个矩形会显形 */

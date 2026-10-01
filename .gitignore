@@ -6,3 +6,4 @@ src-tauri/gen/schemas/
 .DS_Store
 src-tauri/icons/android/
 src-tauri/icons/ios/
+dev.log

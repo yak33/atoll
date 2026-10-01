@@ -633,7 +633,7 @@ html[data-theme='light'] {
   animation: island-flow 2.2s linear;
 }
 
-// 这里使用 @property 注册 CSS 自定义属性,是因为 conic-gradient 的角度变量需要参与动画
+/* 这里使用 @property 注册 CSS 自定义属性,是因为 conic-gradient 的角度变量需要参与动画 */
 @property --flow-angle {
   syntax: '<angle>';
   initial-value: 0deg;

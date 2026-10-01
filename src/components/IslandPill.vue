@@ -18,6 +18,8 @@ const props = defineProps<{
   text: string
   hasError: boolean
   tooltip: string
+  /** 番茄钟摘要(运行中为「🍅 mm:ss」,非运行为空串) */
+  pomoText: string
   /** 偶发光效种类(设置面板可配);空数组 = 不播放 */
   glowEffects: GlowEffect[]
   /** 光效强度系数 0.2-1,由 --glow-strength 乘进颜色透明度 */
@@ -116,6 +118,8 @@ onBeforeUnmount(() => {
       <span v-if="hasError" class="warn-dot">!</span>
     </template>
     <span v-else class="empty">{{ text || '--' }}</span>
+    <!-- 番茄钟摘要:与数据/占位并列,运行中才出现 -->
+    <span v-if="pomoText !== ''" class="pomo">{{ pomoText }}</span>
   </div>
 </template>
 
@@ -382,6 +386,15 @@ onBeforeUnmount(() => {
   font-size: 10px;
   font-weight: 700;
   color: #f59e0b;
+}
+
+/* 番茄钟摘要:番茄橙,与普通用量倒计时的弱化色区分 */
+.pomo {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fb923c;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .empty {

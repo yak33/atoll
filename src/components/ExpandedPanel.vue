@@ -16,6 +16,8 @@ defineProps<{
   fetchedAgo: string
   error: QuotaError | null
   refreshing: boolean
+  /** 番茄钟(remainText 由 App 按秒算好传入,组件纯展示) */
+  pomo: { phase: 'work' | 'break'; running: boolean; remainText: string }
 }>()
 
 const emit = defineEmits<{
@@ -24,6 +26,8 @@ const emit = defineEmits<{
   mouseenter: []
   mouseleave: []
   dragstart: []
+  pomoToggle: []
+  pomoReset: []
 }>()
 
 // ===== 整面板拖动移动窗口:位移超过阈值才算拖动;按钮上按下不参与 =====
@@ -98,6 +102,14 @@ function urgentOf(iso: string | null): boolean {
       </div>
       <span class="win-percent">{{ Math.round(win.usedPercent) }}%</span>
       <span :class="['win-reset', urgentOf(win.resetAt) ? 'win-reset-urgent' : '']">{{ resetTextOf(win.resetAt) || '-' }}</span>
+    </div>
+
+    <div class="pomo-row">
+      <span class="pomo-emoji" title="番茄钟">🍅</span>
+      <span class="pomo-phase">{{ pomo.phase === 'work' ? '专注' : '休息' }}</span>
+      <span :class="['pomo-clock', pomo.running ? '' : 'pomo-clock-idle']">{{ pomo.remainText }}</span>
+      <button class="pomo-btn" type="button" @click="emit('pomoToggle')">{{ pomo.running ? '暂停' : '开始' }}</button>
+      <button class="pomo-btn" type="button" @click="emit('pomoReset')">重置</button>
     </div>
 
     <div v-if="error" class="error-line" :title="error.message">{{ error.message }}</div>
@@ -234,6 +246,55 @@ function urgentOf(iso: string | null): boolean {
 .win-reset-urgent {
   color: #f59e0b;
   font-weight: 700;
+}
+
+/* 番茄钟卡:与 win-row 同层,分隔线隔开 */
+.pomo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--divider);
+  padding-top: 8px;
+}
+
+.pomo-emoji {
+  font-size: 13px;
+}
+
+.pomo-phase {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.pomo-clock {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fb923c;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 未运行时倒计时弱化,提示这不是活数据 */
+.pomo-clock-idle {
+  color: var(--text-muted);
+}
+
+.pomo-btn {
+  height: 22px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pomo-btn:hover {
+  background: var(--border-soft);
 }
 
 .error-line {

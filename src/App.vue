@@ -32,6 +32,15 @@ import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
 import { startFullscreenWatch } from './core/fullscreenWatch'
+import {
+  formatClock,
+  initialState as initialPomodoro,
+  pause,
+  remainOf,
+  reset as resetPomodoro,
+  start as startPomodoro,
+  tick as tickPomodoro,
+} from './core/pomodoro'
 import { nowTick } from './composables/nowTick'
 import type { ZhipuCredential } from './adapters/zhipu'
 import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
@@ -49,7 +58,7 @@ function pillSize(): LogicalSize {
 
 /** 展开态宽度至少 400,胶囊更长时跟随胶囊,避免展开反而比药丸窄 */
 function expandedSize(): LogicalSize {
-  return new LogicalSize(Math.max(400, appearance.value.pillWidth), 185)
+  return new LogicalSize(Math.max(400, appearance.value.pillWidth), 215)
 }
 /** 鼠标离开面板后延迟收回,防止误触抖动(PRD §4.2) */
 const COLLAPSE_DELAY_MS = 500
@@ -68,6 +77,28 @@ let lastSnapshot: ZhipuQuotaSnapshot | null = null
 
 // 外观自定义:不透明度实时生效,胶囊尺寸在药丸态立即应用
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
+
+// ===== 番茄钟 =====
+// 计时基于结束时间戳(见 core/pomodoro.ts 头注释):1s interval 只做显示刷新,
+// 窗口被隐藏导致节流也不影响剩余时间与阶段切换的正确性。
+const pomo = ref(initialPomodoro())
+const pomoNow = ref(Date.now())
+
+const pomoClockText = computed(() => formatClock(remainOf(pomo.value, pomoNow.value)))
+/** 药丸收起态的番茄摘要:仅运行中显示,暂停/未开始不打扰 */
+const pillPomoText = computed(() => (pomo.value.running ? `🍅 ${pomoClockText.value}` : ''))
+
+let pomoTimer = 0
+
+function handlePomoToggle(): void {
+  const now = Date.now()
+  pomo.value = pomo.value.running ? pause(pomo.value, now) : startPomodoro(pomo.value, now)
+  pomoNow.value = now
+}
+
+function handlePomoReset(): void {
+  pomo.value = resetPomodoro(pomo.value)
+}
 
 // 已持久化的窗口锚点(物理像素);null = 从未自定义,初始落位用顶部居中。
 // 拖动结束时机在模态循环里探测不可靠,改为在每次状态切换时读窗口真实位置。
@@ -164,6 +195,17 @@ onMounted(async () => {
       scheduleBlurClose()
     }
   })
+
+  // 番茄钟:常驻 1s 刷新,未运行时早退;阶段切换在此检测并发 toast
+  pomoTimer = window.setInterval(() => {
+    if (!pomo.value.running) return
+    pomoNow.value = Date.now()
+    const result = tickPomodoro(pomo.value, pomoNow.value)
+    if (result.completed !== null) {
+      pomo.value = result.state
+      void sendToast(result.completed === 'work' ? '🍅 专注完成,休息 5 分钟' : '☕ 休息结束,开始专注 25 分钟')
+    }
+  }, 1000)
 })
 
 onBeforeUnmount(() => {
@@ -174,6 +216,7 @@ onBeforeUnmount(() => {
   stopFullscreenWatch?.()
   disposeTheme?.()
   unlistenFocus?.()
+  window.clearInterval(pomoTimer)
 })
 
 // ===== 三态切换 =====
@@ -339,6 +382,7 @@ const tooltipText = computed<string>(() => {
     :text="pillText"
     :has-error="quotaError !== null"
     :tooltip="tooltipText"
+    :pomo-text="pillPomoText"
     :glow-effects="appearance.glowEffects"
     :glow-strength="appearance.glowStrength"
     @click="openSettings"
@@ -354,11 +398,14 @@ const tooltipText = computed<string>(() => {
     :fetched-ago="fetchedAgoText"
     :error="quotaError"
     :refreshing="refreshing"
+    :pomo="{ phase: pomo.phase, running: pomo.running, remainText: pomoClockText }"
     @refresh="handleRefresh"
     @settings="openSettings"
     @mouseenter="cancelCollapse"
     @mouseleave="scheduleCollapse"
     @dragstart="handleDragStart"
+    @pomo-toggle="handlePomoToggle"
+    @pomo-reset="handlePomoReset"
   />
 
   <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->

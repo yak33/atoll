@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * 设置面板(M1 最小实现)。
- * 点药丸弹出:智谱凭据表单 + 手动刷新 + 当前状态。
- * 窗口尺寸切换(340x460)由 App.vue 负责,本组件只管表单本身。
+ * 设置面板。
+ * 顶部模块 Tab(用量/番茄)分区:模块各自的设置项 + 底部公共区(外观/胶囊/系统)。
+ * 窗口尺寸切换(340x700)由 App.vue 负责,本组件只管表单本身。
  *
  * @author ZHANGCHAO 2026/10/01
  */
@@ -10,12 +10,17 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   loadAppearance,
+  loadPomodoro,
   loadTheme,
   saveAppearance,
+  savePomodoro,
   saveTheme,
   DEFAULT_APPEARANCE,
+  DEFAULT_POMODORO,
   type AppearanceSettings,
   type GlowEffect,
+  type IslandModule,
+  type PomodoroSettings,
   type ThemeMode,
 } from '../core/appSettings'
 import { setThemeMode } from '../core/theme'
@@ -23,11 +28,14 @@ import type { ZhipuCredential } from '../adapters/zhipu'
 
 const props = defineProps<{
   initial: ZhipuCredential | null
+  /** 当前激活模块:决定设置面板初始落在哪个 Tab(仅初始,切换不影响药丸模块) */
+  activeModule: IslandModule
 }>()
 
 const emit = defineEmits<{
   save: [credential: ZhipuCredential]
   appearance: [settings: AppearanceSettings]
+  pomoDurations: [settings: PomodoroSettings]
   resetPosition: []
   dragstart: []
   close: []
@@ -120,9 +128,29 @@ async function commitAppearance(): Promise<void> {
   }
 }
 
+// 模块设置 Tab:初始跟随当前激活模块,面板内切换不影响药丸
+const settingsTab = ref<'usage' | 'pomodoro'>('usage')
+
+// 番茄钟时长(分钟):拖动实时 emit(未运行时药丸立即变化),松手落盘
+const pomoCfg = ref<PomodoroSettings>({ ...DEFAULT_POMODORO })
+
+function applyPomoDurations(): void {
+  emit('pomoDurations', { ...pomoCfg.value })
+}
+
+async function commitPomoDurations(): Promise<void> {
+  try {
+    await savePomodoro(pomoCfg.value)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
 onMounted(async () => {
+  settingsTab.value = props.activeModule === 'pomodoro' ? 'pomodoro' : 'usage'
   themeMode.value = await loadTheme()
   appearance.value = await loadAppearance()
+  pomoCfg.value = await loadPomodoro()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -217,7 +245,13 @@ onBeforeUnmount(() => {
       <button class="close-btn" type="button" @click="emit('close')">✕</button>
     </div>
 
-    <div class="form">
+    <div class="module-tabs">
+      <button :class="['tab-btn', settingsTab === 'usage' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'usage'">用量</button>
+      <button :class="['tab-btn', settingsTab === 'pomodoro' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'pomodoro'">番茄</button>
+    </div>
+
+    <!-- ===== 用量模块设置 ===== -->
+    <template v-if="settingsTab === 'usage'">
       <label class="field">
         <span class="field-label">API Key *</span>
         <input v-model="apiKey" type="password" class="input" placeholder="智谱开放平台 API Key" autocomplete="off" />
@@ -239,7 +273,46 @@ onBeforeUnmount(() => {
         <input v-model="projectId" type="text" class="input" placeholder="bigmodel-project" autocomplete="off" />
       </label>
       <span class="field-hint">团队版必填组织 ID,否则官方返回「当前用户不存在coding plan」</span>
+    </template>
 
+    <!-- ===== 番茄钟模块设置 ===== -->
+    <template v-else>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">工作时长</span>
+          <span class="slider-value">{{ pomoCfg.workMin }} 分钟</span>
+        </div>
+        <input
+          v-model.number="pomoCfg.workMin"
+          type="range"
+          class="slider"
+          min="5"
+          max="60"
+          step="5"
+          @input="applyPomoDurations"
+          @change="commitPomoDurations"
+        />
+      </div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">休息时长</span>
+          <span class="slider-value">{{ pomoCfg.breakMin }} 分钟</span>
+        </div>
+        <input
+          v-model.number="pomoCfg.breakMin"
+          type="range"
+          class="slider"
+          min="1"
+          max="30"
+          step="1"
+          @input="applyPomoDurations"
+          @change="commitPomoDurations"
+        />
+      </div>
+      <span class="field-hint">进行中的阶段按原时长走完,下一阶段生效;重置立即应用当前配置</span>
+    </template>
+
+    <!-- ===== 公共区:外观 / 胶囊 / 系统 ===== -->
       <div class="section-title">外观</div>
       <div class="theme-row">
         <button
@@ -333,7 +406,6 @@ onBeforeUnmount(() => {
 
       <!-- 状态反馈:仅在有事发生时出现(自动保存成功/凭据为空阻断),平时不占视觉 -->
       <div v-if="savedAtText !== ''" class="autosave-status">{{ savedAtText }}</div>
-    </div>
   </div>
 </template>
 
@@ -341,6 +413,7 @@ onBeforeUnmount(() => {
 .panel {
   display: flex;
   flex-direction: column;
+  gap: 10px;
   /* 100vh 而非 100%:根组件的父级是 body(无高度),百分比会退化成内容高度,
      内容一超出窗口就被窗口矩形裁掉圆角 */
   height: 100vh;
@@ -493,12 +566,6 @@ onBeforeUnmount(() => {
 .close-btn:hover {
   background: var(--surface-overlay);
   color: var(--text-primary);
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .field {

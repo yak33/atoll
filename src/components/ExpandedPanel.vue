@@ -244,36 +244,6 @@ function urgentOf(iso: string | null): boolean {
   font-weight: 700;
 }
 
-/* 模块 Tab:用量 | 番茄,当前项绿色高亮 */
-.module-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: -2px;
-}
-
-.tab-btn {
-  height: 20px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.tab-btn:hover {
-  color: var(--text-secondary);
-}
-
-.tab-btn-active {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #4ade80;
-}
-
 .error-line {
   font-size: 11px;
   color: #fbbf24;

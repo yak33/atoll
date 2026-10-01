@@ -115,35 +115,6 @@ function onPanelMouseUp(): void {
   }
 }
 
-/* 模块 Tab:与用量面板同款样式 */
-.module-tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.tab-btn {
-  height: 20px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.tab-btn:hover {
-  color: var(--text-secondary);
-}
-
-.tab-btn-active {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #4ade80;
-}
-
 .pomo-title {
   font-size: 12px;
   font-weight: 600;

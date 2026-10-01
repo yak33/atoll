@@ -21,6 +21,7 @@ import {
   loadActiveModule,
   loadCredential,
   loadPillPosition,
+  loadPomodoro,
   loadTheme,
   saveActiveModule,
   saveCredential,
@@ -28,6 +29,7 @@ import {
   type AppearanceSettings,
   type IslandModule,
   type PillPosition,
+  type PomodoroSettings,
   DEFAULT_APPEARANCE,
 } from './core/appSettings'
 import { initTheme } from './core/theme'
@@ -36,10 +38,11 @@ import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
 import { startFullscreenWatch } from './core/fullscreenWatch'
 import {
+  applyDurations,
+  durationOf,
   formatClock,
   initialState as initialPomodoro,
   pause,
-  phaseDuration,
   remainOf,
   reset as resetPomodoro,
   start as startPomodoro,
@@ -127,7 +130,7 @@ const pomoView = computed(() => ({
   remainText: pomoClockText.value,
   stateText: pomo.value.running
     ? ''
-    : pomo.value.remainMs === phaseDuration(pomo.value.phase)
+    : pomo.value.remainMs === durationOf(pomo.value)
       ? '未开始'
       : '已暂停',
 }))
@@ -142,6 +145,11 @@ function handlePomoToggle(): void {
 
 function handlePomoReset(): void {
   pomo.value = resetPomodoro(pomo.value)
+}
+
+/** 设置面板改时长:进行中的阶段按原时长走完,下一阶段生效(语义见 applyDurations) */
+function handlePomoDurations(next: PomodoroSettings): void {
+  pomo.value = applyDurations(pomo.value, next.workMin * 60_000, next.breakMin * 60_000)
 }
 
 // 已持久化的窗口锚点(物理像素);null = 从未自定义,初始落位用顶部居中。
@@ -212,6 +220,9 @@ onMounted(async () => {
   disposeTheme = initTheme(await loadTheme())
   appearance.value = await loadAppearance()
   activeModule.value = await loadActiveModule()
+  // 番茄钟时长从持久化配置初始化
+  const pomoCfg = await loadPomodoro()
+  pomo.value = initialPomodoro(pomoCfg.workMin * 60_000, pomoCfg.breakMin * 60_000)
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -248,7 +259,9 @@ onMounted(async () => {
     const result = tickPomodoro(pomo.value, pomoNow.value)
     if (result.completed !== null) {
       pomo.value = result.state
-      void sendToast(result.completed === 'work' ? '🍅 专注完成,休息 5 分钟' : '☕ 休息结束,开始专注 25 分钟')
+      const workMin = Math.round(result.state.workMs / 60_000)
+      const breakMin = Math.round(result.state.breakMs / 60_000)
+      void sendToast(result.completed === 'work' ? `🍅 专注完成,休息 ${breakMin} 分钟` : `☕ 休息结束,开始专注 ${workMin} 分钟`)
     }
   }, 1000)
 })
@@ -475,9 +488,11 @@ const tooltipText = computed<string>(() => {
   <SettingsPanel
     v-else
     :initial="credential"
+    :active-module="activeModule"
     @save="handleSave"
     @close="closeSettings"
     @appearance="handleAppearance"
+    @pomo-durations="handlePomoDurations"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"
   />
@@ -517,6 +532,35 @@ html[data-theme='light'] {
   --btn-bg: rgba(9, 9, 11, 0.06);
   --sheen-rgb: 9 9 11;
   --sheen-base: 0.4;
+}
+
+/* ===== 模块 Tab(全局):展开面板/设置面板顶部共用的「用量 | 番茄」切换 ===== */
+.module-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab-btn {
+  height: 20px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.tab-btn:hover {
+  color: var(--text-secondary);
+}
+
+.tab-btn-active {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #4ade80;
 }
 
 /* ===== 药丸基座(全局):用量/番茄两种药丸共用的容器外观 ===== */

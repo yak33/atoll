@@ -112,6 +112,37 @@ export async function saveTheme(mode: ThemeMode): Promise<void> {
 
 const APPEARANCE_KEY = 'appearance'
 
+/** 番茄钟模块设置:时长以分钟存储(人类单位),core 层再换算毫秒 */
+export interface PomodoroSettings {
+  workMin: number // 5-60
+  breakMin: number // 1-30
+}
+
+export const DEFAULT_POMODORO: PomodoroSettings = { workMin: 25, breakMin: 5 }
+
+/** 读取番茄钟设置;缺字段或越界时逐项钳制/回落默认 */
+export async function loadPomodoro(): Promise<PomodoroSettings> {
+  try {
+    const store = await getStore()
+    const raw = await store.get<Partial<PomodoroSettings>>('pomodoro')
+    if (raw !== null && typeof raw === 'object') {
+      return {
+        workMin: clampNumber(raw.workMin, 5, 60, DEFAULT_POMODORO.workMin),
+        breakMin: clampNumber(raw.breakMin, 1, 30, DEFAULT_POMODORO.breakMin),
+      }
+    }
+  } catch {
+    // 读取失败回落默认
+  }
+  return { ...DEFAULT_POMODORO }
+}
+
+export async function savePomodoro(settings: PomodoroSettings): Promise<void> {
+  const store = await getStore()
+  await store.set('pomodoro', settings)
+  await store.save()
+}
+
 /** 读取外观设置;存储缺字段或越界时逐项钳制/回落默认 */
 export async function loadAppearance(): Promise<AppearanceSettings> {
   try {

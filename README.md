@@ -25,6 +25,7 @@ atoll/
 │   ├── types.ts         #   统一数据模型
 │   ├── App.vue          #   三态状态机 + 模块层(usage/pomodoro 切换),药丸基座与光效 CSS
 │   └── main.ts
+├── site/                # 对外落地页(纯静态,零构建,Vercel 部署)
 └── src-tauri/           # Rust 壳(窗口配置 + http/store/notification 插件)
 ```
 

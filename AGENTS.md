@@ -27,6 +27,7 @@ Windows 桌面灵动岛悬浮组件(Tauri 2 + Vue 3 + TS)。首个模块:智谱 
 - `src/App.vue` —— 三态状态机 + 模块层(usage/pomodoro 切换)与数据接线;药丸基座与偶发光效 CSS 在此全局层
 - `src-tauri/tauri.conf.json` —— 窗口形态(透明/置顶/无边框)唯一配置点
 - `src-tauri/capabilities/default.json` —— http 域名白名单、store、通知、窗口尺寸/定位权限
+- `site/` —— 对外落地页,纯静态 HTML/CSS/JS 零构建,经 Vercel 部署。与 `src/` 不共享代码:药丸与面板样式是从 App.vue / components 手工移植的副本,改产品外观时记得同步这里
 - `docs/03-智谱额度接口.md` —— 接口行为与解析规则的唯一事实来源,改 adapter 前先读
 
 模块约定:每个功能模块 = 独立 core 逻辑 + 独立药丸/面板组件对;容器层(App.vue)持有 `activeModule` 并负责切换(收起态滚轮、展开面板 Tab)与持久化;新模块照番茄钟的模式追加。

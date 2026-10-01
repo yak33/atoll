@@ -23,7 +23,7 @@ const props = defineProps<{
   glowEffects: GlowEffect[]
 }>()
 
-const emit = defineEmits<{ click: []; mouseenter: []; wheel: [] }>()
+const emit = defineEmits<{ click: []; mouseenter: []; wheel: [event?: WheelEvent] }>()
 
 const { actionName } = useGlowEffects(() => props.glowEffects)
 
@@ -60,7 +60,7 @@ const resetHighlight = computed<boolean>(() => {
     :title="tooltip"
     @click="emit('click')"
     @mouseenter="emit('mouseenter')"
-    @wheel.prevent="emit('wheel')"
+    @wheel.prevent="emit('wheel', $event)"
   >
     <template v-if="win">
       <span class="label">{{ win.key === 'weekly' ? '7d' : '5h' }}</span>
@@ -97,14 +97,18 @@ const resetHighlight = computed<boolean>(() => {
   color: rgba(228, 228, 231, 0.75);
 }
 
-/* >=90% 红色脉冲:呼吸式外发光 */
+/* >=90% 红色脉冲:呼吸式内发光,避免外发光被透明窗口边缘硬裁切 */
 @keyframes island-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.25),
+      inset 0 0 10px rgba(239, 68, 68, 0.35);
   }
   50% {
-    box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.25);
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.45),
+      inset 0 0 18px 2px rgba(239, 68, 68, 0.75);
   }
 }
 
@@ -115,29 +119,49 @@ const resetHighlight = computed<boolean>(() => {
 }
 
 .track {
+  position: relative;
   flex: 1;
   height: 6px;
-  border-radius: 3px;
+  border-radius: 9999px;
   background: var(--track-bg);
+  box-shadow: inset 0 1px 1.5px rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
 
 .fill {
+  position: relative;
   height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
+  border-radius: 9999px;
+  transition: width 0.4s var(--ease-spring-soft, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+/* 进度条端点发光游标(Glow Thumb):在进度条右侧加入微小高光线和光晕 */
+.fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2.5px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 0 4px 1px currentColor;
+  opacity: 0.9;
 }
 
 .bar-green {
-  background: #22c55e;
+  background: linear-gradient(90deg, #15803d, #22c55e);
+  color: #4ade80;
 }
 
 .bar-amber {
-  background: #f59e0b;
+  background: linear-gradient(90deg, #b45309, #f59e0b);
+  color: #fbbf24;
 }
 
 .bar-red {
-  background: #ef4444;
+  background: linear-gradient(90deg, #b91c1c, #ef4444);
+  color: #f87171;
 }
 
 .percent {

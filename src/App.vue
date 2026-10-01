@@ -107,11 +107,18 @@ async function handleSwitchModule(next: IslandModule): Promise<void> {
 
 // 滚轮一次滚动会连发多个 wheel 事件,400ms 节流防止来回抖
 let lastWheelSwitch = 0
+// 滚轮切换滑屏方向: 'down' | 'up'
+const wheelDirection = ref<'down' | 'up'>('down')
 
-function handlePillWheel(): void {
+function handlePillWheel(event?: WheelEvent): void {
   const now = Date.now()
   if (now - lastWheelSwitch < 400) return
   lastWheelSwitch = now
+  if (event && event.deltaY < 0) {
+    wheelDirection.value = 'up'
+  } else {
+    wheelDirection.value = 'down'
+  }
   void handleSwitchModule(activeModule.value === 'usage' ? 'pomodoro' : 'usage')
 }
 
@@ -449,27 +456,31 @@ const tooltipText = computed<string>(() => {
 </script>
 
 <template>
-  <!-- 收起态:按模块渲染药丸;滚轮切换模块,悬停展开,点击设置 -->
-  <IslandPill
-    v-if="mode === 'pill' && activeModule === 'usage'"
-    :win="primary"
-    :text="pillText"
-    :has-error="quotaError !== null"
-    :tooltip="tooltipText"
-    :glow-effects="appearance.glowEffects"
-    @click="openSettings"
-    @mouseenter="handlePillHover"
-    @wheel="handlePillWheel"
-  />
-  <PomodoroPill
-    v-else-if="mode === 'pill'"
-    :pomo="pomoView"
-    :tooltip="'🍅 番茄钟 · 滚轮切回用量'"
-    :glow-effects="appearance.glowEffects"
-    @click="openSettings"
-    @mouseenter="handlePillHover"
-    @wheel="handlePillWheel"
-  />
+  <!-- 收起态:按模块渲染药丸;滚轮切换模块(带推拉滑屏微动效),悬停展开,点击设置 -->
+  <Transition v-if="mode === 'pill'" :name="'pill-slide-' + wheelDirection" mode="out-in">
+    <IslandPill
+      v-if="activeModule === 'usage'"
+      key="usage"
+      :win="primary"
+      :text="pillText"
+      :has-error="quotaError !== null"
+      :tooltip="tooltipText"
+      :glow-effects="appearance.glowEffects"
+      @click="openSettings"
+      @mouseenter="handlePillHover"
+      @wheel="handlePillWheel"
+    />
+    <PomodoroPill
+      v-else
+      key="pomodoro"
+      :pomo="pomoView"
+      :tooltip="'🍅 番茄钟 · 滚轮切回用量'"
+      :glow-effects="appearance.glowEffects"
+      @click="openSettings"
+      @mouseenter="handlePillHover"
+      @wheel="handlePillWheel"
+    />
+  </Transition>
 
   <!-- 展开态:按模块渲染面板,顶部 Tab 切换 -->
   <ExpandedPanel
@@ -521,7 +532,12 @@ const tooltipText = computed<string>(() => {
   --surface-rgb: 24 24 27; /* 深色主题背景基色 */
   --bg-surface: rgb(var(--surface-rgb) / var(--bg-alpha)); /* 药丸 */
   --bg-panel: rgb(var(--surface-rgb) / var(--bg-alpha)); /* 展开面板/设置面板 */
-  --pill-border: transparent;
+  --pill-border: rgba(255, 255, 255, 0.08);
+  --pill-border-hover: rgba(255, 255, 255, 0.2);
+  --pill-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.16), inset 0 -1px 0.5px rgba(0, 0, 0, 0.35);
+  --pill-shadow-hover: inset 0 1px 1px rgba(255, 255, 255, 0.28), inset 0 -1px 0.5px rgba(0, 0, 0, 0.35);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --ease-spring-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --text-primary: #e4e4e7;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
@@ -538,6 +554,9 @@ const tooltipText = computed<string>(() => {
 html[data-theme='light'] {
   --surface-rgb: 255 255 255;
   --pill-border: rgba(9, 9, 11, 0.08); /* 浅色背景上给药丸一点描边防止融入壁纸 */
+  --pill-border-hover: rgba(9, 9, 11, 0.18);
+  --pill-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.9), inset 0 -1px 0.5px rgba(0, 0, 0, 0.08);
+  --pill-shadow-hover: inset 0 1px 1px rgba(255, 255, 255, 1), inset 0 -1px 0.5px rgba(0, 0, 0, 0.12);
   --text-primary: #27272a;
   --text-secondary: #52525b;
   --text-muted: #71717a;
@@ -593,12 +612,26 @@ html[data-theme='light'] {
   border-radius: 9999px;
   background: var(--bg-surface);
   border: 1px solid var(--pill-border);
+  box-shadow: var(--pill-shadow);
   color: var(--text-primary);
   font-family: 'Segoe UI', system-ui, sans-serif;
   font-size: 12px;
   user-select: none;
   cursor: pointer;
-  transition: background 0.3s ease, border-color 0.3s ease;
+  transition:
+    background 0.3s var(--ease-spring-soft),
+    border-color 0.25s ease,
+    transform 0.18s var(--ease-spring),
+    box-shadow 0.25s ease;
+}
+
+.island:hover {
+  border-color: var(--pill-border-hover);
+  box-shadow: var(--pill-shadow-hover);
+}
+
+.island:active {
+  transform: scale(0.975);
 }
 
 /* ===== 偶发随机光效(全局):触发器在 useGlowEffects,种类在设置面板可配 =====
@@ -746,12 +779,45 @@ html[data-theme='light'] {
   }
 }
 
-/* 尊重系统「减少动态效果」:偶发光效静止 */
+/* ===== 药丸滚轮切换推拉动效 ===== */
+.pill-slide-down-enter-active,
+.pill-slide-down-leave-active,
+.pill-slide-up-enter-active,
+.pill-slide-up-leave-active {
+  transition: opacity 0.2s var(--ease-spring-soft), transform 0.22s var(--ease-spring);
+}
+
+.pill-slide-down-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+}
+.pill-slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+
+.pill-slide-up-enter-from {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+.pill-slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+}
+
+/* 尊重系统「减少动态效果」:偶发光效与物理动效静止 */
 @media (prefers-reduced-motion: reduce) {
   .island::before,
   .island::after {
     animation: none;
     opacity: 0;
+  }
+  .island,
+  .pill-slide-down-enter-active,
+  .pill-slide-down-leave-active,
+  .pill-slide-up-enter-active,
+  .pill-slide-up-leave-active {
+    transition: none;
   }
 }
 

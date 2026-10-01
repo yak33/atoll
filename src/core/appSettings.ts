@@ -37,9 +37,32 @@ export async function saveActiveModule(module: IslandModule): Promise<void> {
 export type ThemeMode = 'auto' | 'light' | 'dark'
 
 /** 药丸偶发光效种类(全不选 = 关闭) */
-export type GlowEffect = 'flow' | 'ripple' | 'sweep' | 'dual' | 'twin' | 'sparkle'
+export type GlowEffect =
+  | 'flow'
+  | 'comet'
+  | 'dual'
+  | 'clash'
+  | 'ripple'
+  | 'sonar'
+  | 'twin'
+  | 'aurora'
+  | 'eclipse'
+  | 'sweep'
+  | 'sparkle'
 
-export const GLOW_EFFECTS: GlowEffect[] = ['flow', 'ripple', 'sweep', 'dual', 'twin', 'sparkle']
+export const GLOW_EFFECTS: GlowEffect[] = [
+  'flow',
+  'comet',
+  'dual',
+  'clash',
+  'ripple',
+  'sonar',
+  'twin',
+  'aurora',
+  'eclipse',
+  'sweep',
+  'sparkle',
+]
 
 /** 外观自定义:胶囊长度、整体不透明度、偶发光效(读写都会做范围钳制);高度固定不走配置 */
 export interface AppearanceSettings {
@@ -149,9 +172,20 @@ export async function loadAppearance(): Promise<AppearanceSettings> {
     const store = await getStore()
     const raw = await store.get<Partial<AppearanceSettings>>(APPEARANCE_KEY)
     if (raw !== null && typeof raw === 'object') {
-      // 光效种类:只保留合法值,去重;旧数据无此字段回落全开
-      const rawEffects = Array.isArray(raw.glowEffects) ? raw.glowEffects : GLOW_EFFECTS
-      const glowEffects = GLOW_EFFECTS.filter((effect) => rawEffects.includes(effect))
+      // 光效种类:只保留合法值;若老配置为全开(原6种都在),自动将新增光效纳入池子
+      let glowEffects: GlowEffect[]
+      if (Array.isArray(raw.glowEffects)) {
+        const hadAllOld = ['flow', 'ripple', 'sweep', 'dual', 'twin', 'sparkle'].every((e) =>
+          raw.glowEffects!.includes(e as GlowEffect),
+        )
+        const baseSet = new Set(raw.glowEffects)
+        if (hadAllOld) {
+          GLOW_EFFECTS.forEach((e) => baseSet.add(e))
+        }
+        glowEffects = GLOW_EFFECTS.filter((e) => baseSet.has(e))
+      } else {
+        glowEffects = [...GLOW_EFFECTS]
+      }
       return {
         pillWidth: clampNumber(raw.pillWidth, 180, 420, DEFAULT_APPEARANCE.pillWidth),
         opacity: clampNumber(raw.opacity, 0.5, 1, DEFAULT_APPEARANCE.opacity),

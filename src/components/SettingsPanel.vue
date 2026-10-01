@@ -17,6 +17,7 @@ import {
   saveTheme,
   DEFAULT_APPEARANCE,
   DEFAULT_POMODORO,
+  GLOW_EFFECTS,
   type AppearanceSettings,
   type GlowEffect,
   type IslandModule,
@@ -92,15 +93,47 @@ const themeMode = ref<ThemeMode>('auto')
 // 外观自定义:拖动实时预览(emit 给 App),松手落盘
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
-// 光效种类:多选按钮组文案(顺序即展示顺序)
-const GLOW_LABELS: { value: GlowEffect; label: string }[] = [
-  { value: 'flow', label: '边框流光' },
-  { value: 'ripple', label: '波纹' },
-  { value: 'sweep', label: '扫光' },
-  { value: 'dual', label: '双流光' },
-  { value: 'twin', label: '双波汇流' },
-  { value: 'sparkle', label: '星火' },
+// 光效种类分组(解决设置面板平铺 11 种按钮导致的臃肿)
+const GLOW_GROUPS: {
+  title: string
+  items: { value: GlowEffect; label: string }[]
+}[] = [
+  {
+    title: '轮廓流光',
+    items: [
+      { value: 'flow', label: '边框流光' },
+      { value: 'comet', label: '彗星' },
+      { value: 'dual', label: '双流光' },
+      { value: 'clash', label: '粒子对撞' },
+    ],
+  },
+  {
+    title: '波纹声呐',
+    items: [
+      { value: 'ripple', label: '波纹' },
+      { value: 'sonar', label: '声呐' },
+      { value: 'twin', label: '双波汇流' },
+    ],
+  },
+  {
+    title: '微光氛围',
+    items: [
+      { value: 'aurora', label: '极光' },
+      { value: 'eclipse', label: '月食' },
+      { value: 'sweep', label: '扫光' },
+      { value: 'sparkle', label: '星火' },
+    ],
+  },
 ]
+
+// 细项是否展开(默认折叠,设置面板保持精简清爽)
+const glowExpanded = ref(false)
+
+function toggleAllGlow(enable: boolean): void {
+  appearance.value.glowEffects = enable ? [...GLOW_EFFECTS] : []
+  applyAppearance()
+  commitAppearance()
+}
 
 function applyAppearance(): void {
   // 不透明度直接在这里写 CSS 变量:单跳直达,不依赖跨组件事件链的完整性
@@ -362,20 +395,47 @@ onBeforeUnmount(() => {
     </div>
     <span class="field-hint">长度在收回药丸后生效;拖动展开面板标题行可移动位置</span>
 
-    <div class="slider-head">
-      <span class="field-label">偶发光效</span>
-      <span class="slider-value">{{ appearance.glowEffects.length === 0 ? '关闭' : `${appearance.glowEffects.length} 种` }}</span>
+    <div class="glow-header">
+      <div class="slider-head" style="flex: 1">
+        <span class="field-label">偶发光效</span>
+        <span class="slider-value">
+          {{ appearance.glowEffects.length === 0 ? '已关闭' : `${appearance.glowEffects.length}/${GLOW_EFFECTS.length} 种` }}
+        </span>
+      </div>
+      <div class="glow-actions">
+        <button
+          class="glow-action-btn"
+          type="button"
+          @click="toggleAllGlow(appearance.glowEffects.length < GLOW_EFFECTS.length)"
+        >
+          {{ appearance.glowEffects.length === GLOW_EFFECTS.length ? '全部关闭' : '全部开启' }}
+        </button>
+        <button
+          :class="['glow-action-btn', glowExpanded ? 'glow-action-btn-active' : '']"
+          type="button"
+          @click="glowExpanded = !glowExpanded"
+        >
+          {{ glowExpanded ? '收起 ▴' : '自定义 ▾' }}
+        </button>
+      </div>
     </div>
-    <div class="theme-row">
-      <button
-        v-for="option in GLOW_LABELS"
-        :key="option.value"
-        :class="['theme-btn', appearance.glowEffects.includes(option.value) ? 'theme-btn-active' : '']"
-        type="button"
-        @click="toggleGlow(option.value)"
-      >
-        {{ option.label }}
-      </button>
+
+    <!-- 折叠区域:仅当点击「自定义 ▾」时展开,平时不占高度,告别臃肿 -->
+    <div v-if="glowExpanded" class="glow-groups-box">
+      <div v-for="group in GLOW_GROUPS" :key="group.title" class="glow-group">
+        <div class="glow-group-title">{{ group.title }}</div>
+        <div class="glow-group-tags">
+          <button
+            v-for="item in group.items"
+            :key="item.value"
+            :class="['tag-btn', appearance.glowEffects.includes(item.value) ? 'tag-btn-active' : '']"
+            type="button"
+            @click="toggleGlow(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="slider-field">
@@ -482,6 +542,96 @@ onBeforeUnmount(() => {
   background: rgba(34, 197, 94, 0.16);
   border-color: rgba(34, 197, 94, 0.4);
   color: #4ade80;
+}
+
+/* 偶发光效:紧凑折叠栏与快捷按钮 */
+.glow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.glow-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.glow-action-btn {
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--surface-overlay);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.glow-action-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.glow-action-btn-active {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.glow-groups-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-soft);
+}
+
+.glow-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.glow-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.glow-group-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag-btn {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.tag-btn:hover {
+  color: var(--text-primary);
+}
+
+.tag-btn-active {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+  font-weight: 600;
 }
 
 /* 滑杆字段:标签 + 当前值 + range */

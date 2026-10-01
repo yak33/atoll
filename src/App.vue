@@ -779,6 +779,145 @@ html[data-theme='light'] {
   }
 }
 
+/* 彗星拖尾:高亮白核+长渐变衰减尾迹,加速度掠行 */
+.island.do-comet::before {
+  opacity: 1;
+  background: conic-gradient(
+    from var(--flow-angle),
+    transparent 0deg 200deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.15 * var(--glow-strength))) 240deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.5 * var(--glow-strength))) 290deg,
+    #ffffff 325deg,
+    transparent 328deg
+  );
+  animation: island-flow 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 粒子对撞:两段光束从顶部同时向两侧流动并在底部汇合爆光 */
+.island.do-clash::before {
+  opacity: 1;
+  background: conic-gradient(
+    from var(--flow-angle),
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0deg 25deg,
+    transparent 50deg 180deg,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 180deg 205deg,
+    transparent 230deg 360deg
+  );
+  animation: island-flow 1.6s ease-in-out;
+}
+
+.island.do-clash::after {
+  background: radial-gradient(
+    circle at 50% 95%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.5 * var(--glow-strength))) 0%,
+    transparent 65%
+  );
+  background-repeat: no-repeat;
+  animation: island-clash-burst 1.6s ease-out;
+}
+
+@keyframes island-clash-burst {
+  0%,
+  65% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* 极光色散:青蓝/薄荷绿/淡紫在上边缘轻拂流动 */
+.island.do-aurora::after {
+  background: linear-gradient(
+    100deg,
+    transparent 15%,
+    rgba(56, 189, 248, calc(0.35 * var(--glow-strength))) 35%,
+    rgba(52, 211, 153, calc(0.4 * var(--glow-strength))) 50%,
+    rgba(167, 139, 250, calc(0.35 * var(--glow-strength))) 65%,
+    transparent 85%
+  );
+  background-repeat: no-repeat;
+  background-size: 240% 100%;
+  animation: island-aurora 2.2s ease-in-out;
+}
+
+@keyframes island-aurora {
+  0% {
+    background-position: 130% 0;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    background-position: -40% 0;
+    opacity: 0;
+  }
+}
+
+/* 声呐涟漪:从药丸几何中心向外等比发散的椭圆环波 */
+.island.do-sonar::after {
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    transparent 30%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.45 * var(--glow-strength))) 48%,
+    transparent 65%
+  );
+  background-repeat: no-repeat;
+  background-position: center;
+  animation: island-sonar 1.8s ease-out;
+}
+
+@keyframes island-sonar {
+  0% {
+    background-size: 10% 20%;
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.9;
+  }
+  100% {
+    background-size: 160% 240%;
+    opacity: 0;
+  }
+}
+
+/* 月食金边:顶边局部高光拉扯延展的日冕冷光 */
+.island.do-eclipse::after {
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.65 * var(--glow-strength))) 0%,
+    transparent 70%
+  );
+  background-repeat: no-repeat;
+  animation: island-eclipse 1.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes island-eclipse {
+  0% {
+    background-size: 10% 80%;
+    background-position: 50% 0%;
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    background-size: 95% 140%;
+    background-position: 50% 0%;
+    opacity: 0;
+  }
+}
+
 /* ===== 药丸滚轮切换推拉动效 ===== */
 .pill-slide-down-enter-active,
 .pill-slide-down-leave-active,

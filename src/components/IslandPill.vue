@@ -71,10 +71,10 @@ function playRandomAction(pool: GlowEffect[]): void {
   }
   lastAction = next
   actionName.value = next
-  // 1500ms 大于最长动画时长(flow 1.4s),到点摘 class 复位
+  // 2300ms 大于最长动画时长(flow/dual 2.2s),到点摘 class 复位
   clearActionTimer = window.setTimeout(() => {
     actionName.value = ''
-  }, 1500)
+  }, 2300)
 }
 
 function scheduleNextAction(pool: GlowEffect[], delayMs: number): void {
@@ -203,7 +203,7 @@ onBeforeUnmount(() => {
 
 .island.do-flow::before {
   opacity: 1;
-  animation: island-flow 1.4s linear;
+  animation: island-flow 2.2s linear;
 }
 
 @property --flow-angle {
@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
   );
   background-repeat: no-repeat;
   background-size: 0% 100%;
-  animation: island-ripple 1.1s ease-out;
+  animation: island-ripple 1.7s ease-out;
 }
 
 @keyframes island-ripple {
@@ -252,7 +252,7 @@ onBeforeUnmount(() => {
   );
   background-repeat: no-repeat;
   background-size: 260% 100%;
-  animation: island-sweep 1s ease-in-out;
+  animation: island-sweep 1.6s ease-in-out;
 }
 
 @keyframes island-sweep {
@@ -276,7 +276,7 @@ onBeforeUnmount(() => {
     rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 210deg 240deg,
     transparent 270deg
   );
-  animation: island-flow 1.4s linear;
+  animation: island-flow 2.2s linear;
 }
 
 /* 双波汇流:两端圆头同时泛光,向中间汇合;复用波纹的扩散 keyframes */
@@ -286,7 +286,7 @@ onBeforeUnmount(() => {
     radial-gradient(circle at 94% 50%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * 0.4 * var(--glow-strength))) 0%, transparent 50%);
   background-repeat: no-repeat;
   background-size: 0% 100%;
-  animation: island-ripple 1.2s ease-out;
+  animation: island-ripple 1.9s ease-out;
 }
 
 /* 星火:三个小光点分布在不同位置,整体透明度分段跳闪 */
@@ -296,7 +296,7 @@ onBeforeUnmount(() => {
     radial-gradient(circle 3px at 55% 62%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%),
     radial-gradient(circle 4px at 76% 34%, rgb(var(--sheen-rgb) / calc(var(--sheen-base) * var(--glow-strength))) 0%, transparent 100%);
   background-repeat: no-repeat;
-  animation: island-sparkle 1.3s ease-in-out;
+  animation: island-sparkle 2s ease-in-out;
 }
 
 @keyframes island-sparkle {

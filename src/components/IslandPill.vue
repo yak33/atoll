@@ -49,6 +49,26 @@ const resetHighlight = computed<boolean>(() => {
 
 <template>
   <div :class="['island', alertClass]" :title="tooltip" @click="emit('click')" @mouseenter="emit('mouseenter')">
+    <!-- 机器人 logo:与 app-icon 同源造型(去掉渐变底徽章),白脸 + 淡深描边在深浅两主题都可辨 -->
+    <svg class="bot" viewBox="96 76 832 752" aria-hidden="true">
+      <g class="bot-antenna">
+        <line x1="512" y1="210" x2="512" y2="330" stroke="#A1A1AA" stroke-width="36" stroke-linecap="round" />
+        <circle cx="512" cy="164" r="56" fill="#FDE047" />
+        <circle cx="494" cy="146" r="18" fill="#FEF9C3" />
+      </g>
+      <rect x="128" y="462" width="96" height="160" rx="48" fill="#C7D2FE" />
+      <rect x="800" y="462" width="96" height="160" rx="48" fill="#C7D2FE" />
+      <rect x="200" y="296" width="624" height="500" rx="150" fill="#FFFFFF" stroke="rgba(9, 9, 11, 0.15)" stroke-width="12" />
+      <g class="bot-eyes">
+        <circle cx="382" cy="526" r="58" fill="#1E1B4B" />
+        <circle cx="642" cy="526" r="58" fill="#1E1B4B" />
+        <circle cx="402" cy="504" r="20" fill="#FFFFFF" />
+        <circle cx="662" cy="504" r="20" fill="#FFFFFF" />
+      </g>
+      <ellipse cx="292" cy="644" rx="50" ry="32" fill="#FBCFE8" />
+      <ellipse cx="732" cy="644" rx="50" ry="32" fill="#FBCFE8" />
+      <path d="M 448 636 Q 512 702 576 636" stroke="#1E1B4B" stroke-width="30" fill="none" stroke-linecap="round" />
+    </svg>
     <template v-if="win">
       <span class="label">{{ win.key === 'weekly' ? '7d' : '5h' }}</span>
       <div class="track">
@@ -175,4 +195,52 @@ const resetHighlight = computed<boolean>(() => {
 .empty {
   color: var(--text-secondary);
 }
+
+/* 机器人 logo:整体缓慢悬浮(幅度 1.5px,不干扰数据阅读) */
+.bot {
+  width: 26px;
+  height: auto;
+  flex-shrink: 0;
+  animation: bot-bob 3.2s ease-in-out infinite;
+}
+
+/* 眨眼:周期取 5.2s(非整数,避免与悬浮动画同步叠加出机械感) */
+.bot-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bot-blink 5.2s infinite;
+}
+
+@keyframes bot-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* 92%~95% 闭眼约 150ms,其余时间睁眼 */
+@keyframes bot-blink {
+  0%,
+  91%,
+  96%,
+  100% {
+    transform: scaleY(1);
+  }
+  93%,
+  94% {
+    transform: scaleY(0.08);
+  }
+}
+
+/* 尊重系统「减少动态效果」:只保留静态呈现 */
+@media (prefers-reduced-motion: reduce) {
+  .bot,
+  .bot-eyes {
+    animation: none;
+  }
+}
+
 </style>

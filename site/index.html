@@ -4,13 +4,22 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>atoll 环礁 · Windows 桌面灵动岛组件</title>
-<meta name="description" content="atoll 是钉在 Windows 屏幕顶部的灵动岛悬浮组件。智谱 GLM Coding Plan 的 5 小时与 7 天滚动用量、重置倒计时、限额变色告警,收进一颗 44 像素高的药丸里。Tauri 2 + Vue 3,开源。" />
+<meta name="description" content="atoll 是钉在 Windows 屏幕顶部的灵动岛组件。智谱 GLM Coding Plan 的 5 小时与 7 天滚动用量、重置倒计时、限额告警，收进一颗 44 像素的药丸。Tauri 2 + Vue 3，开源。" />
 <meta property="og:type" content="website" />
+<meta property="og:site_name" content="atoll" />
+<meta property="og:url" content="https://atoll-site-swart.vercel.app/" />
 <meta property="og:title" content="atoll 环礁 · Windows 桌面灵动岛组件" />
-<meta property="og:description" content="额度还剩多少,瞟一眼就知道。智谱 GLM Coding Plan 用量监控 + 番茄钟,常驻 Windows 屏幕顶部。" />
-<meta property="og:image" content="./assets/desktop.webp" />
-<meta property="og:image:width" content="1792" />
-<meta property="og:image:height" content="920" />
+<meta property="og:description" content="额度还剩多少，瞟一眼就知道。智谱 GLM Coding Plan 用量监控 + 番茄钟，常驻 Windows 屏幕顶部。" />
+<!-- og:image 必须是绝对 URL：浏览器会自动补全，但社交抓取器不会。
+     格式用 PNG 不用 WebP：微信与 Facebook 对 WebP 的 og:image 支持不稳。
+     换绑自定义域名时，下面三处绝对 URL 要一起改。 -->
+<meta property="og:image" content="https://atoll-site-swart.vercel.app/assets/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="atoll 环礁 · Windows 桌面灵动岛组件" />
+<meta name="twitter:description" content="额度还剩多少，瞟一眼就知道。智谱 GLM Coding Plan 用量监控 + 番茄钟，常驻 Windows 屏幕顶部。" />
+<meta name="twitter:image" content="https://atoll-site-swart.vercel.app/assets/og.png" />
 <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
 <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
 <link rel="icon" href="./assets/icon.svg" type="image/svg+xml" />
@@ -263,14 +272,15 @@
   <h2 class="section-title">Tauri 2 + Vue 3，没有后端。</h2>
   <p class="section-sub">API Key 存在本机应用数据目录，请求经 Rust 侧发出以绕开 WebView 的同源限制，域名白名单收紧到智谱两个站点。</p>
 
-  <!-- 取单色白版 logo，深浅两套主题靠 CSS filter 翻色，不用品牌原色（暗底上花花绿绿很杂） -->
+  <!-- 单色白版 logo 已自托管（Simple Icons, CC0）：不依赖第三方 CDN，
+       深浅两套主题靠 CSS filter 翻色，不用品牌原色（暗底上花花绿绿很杂） -->
   <div class="logos">
-    <img src="https://cdn.simpleicons.org/tauri/ffffff" alt="Tauri" width="30" height="30" loading="lazy" />
-    <img src="https://cdn.simpleicons.org/vuedotjs/ffffff" alt="Vue" width="30" height="30" loading="lazy" />
-    <img src="https://cdn.simpleicons.org/typescript/ffffff" alt="TypeScript" width="30" height="30" loading="lazy" />
-    <img src="https://cdn.simpleicons.org/rust/ffffff" alt="Rust" width="30" height="30" loading="lazy" />
-    <img src="https://cdn.simpleicons.org/vite/ffffff" alt="Vite" width="30" height="30" loading="lazy" />
-    <img src="https://cdn.simpleicons.org/vitest/ffffff" alt="Vitest" width="30" height="30" loading="lazy" />
+    <img src="./assets/logos/tauri.svg" alt="Tauri" width="30" height="30" loading="lazy" />
+    <img src="./assets/logos/vuedotjs.svg" alt="Vue" width="30" height="30" loading="lazy" />
+    <img src="./assets/logos/typescript.svg" alt="TypeScript" width="30" height="30" loading="lazy" />
+    <img src="./assets/logos/rust.svg" alt="Rust" width="30" height="30" loading="lazy" />
+    <img src="./assets/logos/vite.svg" alt="Vite" width="30" height="30" loading="lazy" />
+    <img src="./assets/logos/vitest.svg" alt="Vitest" width="30" height="30" loading="lazy" />
   </div>
 
   <dl class="metrics reveal">

@@ -173,6 +173,7 @@ function applyOpacityVar(): void {
   document.documentElement.style.setProperty('--bg-alpha', String(appearance.value.opacity))
   // 光效强度同样走 CSS 变量,组件里按 calc 乘出最终透明度
   document.documentElement.style.setProperty('--glow-strength', String(appearance.value.glowStrength))
+  document.documentElement.dataset.skin = appearance.value.skin
 }
 
 async function handleAppearance(next: AppearanceSettings): Promise<void> {
@@ -529,7 +530,7 @@ const tooltipText = computed<string>(() => {
 /* ===== 主题变量:默认深色,html[data-theme='light'] 覆盖为浅色 ===== */
 :root {
   --bg-alpha: 1; /* 背景 alpha(0.5-1),由设置面板实时写入;文字不受影响 */
-  --surface-rgb: 24 24 27; /* 深色主题背景基色 */
+  --surface-rgb: 24 24 27; /* 深色主题背景基色(黑曜石) */
   --bg-surface: rgb(var(--surface-rgb) / var(--bg-alpha)); /* 药丸 */
   --bg-panel: rgb(var(--surface-rgb) / var(--bg-alpha)); /* 展开面板/设置面板 */
   --pill-border: rgba(255, 255, 255, 0.08);
@@ -549,6 +550,11 @@ const tooltipText = computed<string>(() => {
   --sheen-rgb: 255 255 255; /* 药丸偶发光效基色(深色主题用白光) */
   --sheen-base: 0.55; /* 满强度时的流光 alpha;波纹/扫光在此基础上 ×0.4,再乘用户强度 --glow-strength */
   --glow-strength: 1; /* 由设置面板实时写入 */
+
+  /* 主题强调色:默认黑曜石翡翠绿 */
+  --accent-rgb: 34 197 94;
+  --accent-color: #4ade80;
+  --accent-gradient: linear-gradient(90deg, #15803d, #22c55e);
 }
 
 html[data-theme='light'] {
@@ -567,6 +573,112 @@ html[data-theme='light'] {
   --btn-bg: rgba(9, 9, 11, 0.06);
   --sheen-rgb: 9 9 11;
   --sheen-base: 0.4;
+
+  --accent-rgb: 22 163 74;
+  --accent-color: #16a34a;
+  --accent-gradient: linear-gradient(90deg, #16a34a, #4ade80);
+}
+
+/* ===== 皮肤主题:深色 (默认) ===== */
+html[data-skin='midnight'] {
+  --surface-rgb: 15 23 42; /* Slate-900 深海蓝灰 */
+  --accent-rgb: 14 165 233;
+  --accent-color: #38bdf8;
+  --accent-gradient: linear-gradient(90deg, #0284c7, #38bdf8);
+  --sheen-rgb: 186 230 253;
+  --pill-border: rgba(56, 189, 248, 0.14);
+  --pill-border-hover: rgba(56, 189, 248, 0.32);
+}
+
+html[data-skin='aurora'] {
+  --surface-rgb: 26 16 38; /* 暗夜幽紫 */
+  --accent-rgb: 168 85 247;
+  --accent-color: #c084fc;
+  --accent-gradient: linear-gradient(90deg, #9333ea, #c084fc);
+  --sheen-rgb: 233 213 255;
+  --pill-border: rgba(192, 132, 252, 0.15);
+  --pill-border-hover: rgba(192, 132, 252, 0.34);
+}
+
+html[data-skin='sunset'] {
+  --surface-rgb: 31 20 18; /* 暖碳暗褐 */
+  --accent-rgb: 249 115 22;
+  --accent-color: #fb923c;
+  --accent-gradient: linear-gradient(90deg, #ea580c, #fb923c);
+  --sheen-rgb: 254 215 170;
+  --pill-border: rgba(251, 146, 60, 0.15);
+  --pill-border-hover: rgba(251, 146, 60, 0.34);
+}
+
+html[data-skin='forest'] {
+  --surface-rgb: 12 28 22; /* 幽绿暗丛 */
+  --accent-rgb: 16 185 129;
+  --accent-color: #34d399;
+  --accent-gradient: linear-gradient(90deg, #059669, #34d399);
+  --sheen-rgb: 167 243 208;
+  --pill-border: rgba(52, 211, 153, 0.15);
+  --pill-border-hover: rgba(52, 211, 153, 0.34);
+}
+
+html[data-skin='cyber'] {
+  --surface-rgb: 22 22 24; /* 哑光黑钛 */
+  --accent-rgb: 234 179 8;
+  --accent-color: #facc15;
+  --accent-gradient: linear-gradient(90deg, #ca8a04, #facc15);
+  --sheen-rgb: 254 240 138;
+  --pill-border: rgba(250, 204, 21, 0.15);
+  --pill-border-hover: rgba(250, 204, 21, 0.34);
+}
+
+/* ===== 皮肤主题:浅色 ===== */
+html[data-theme='light'][data-skin='midnight'] {
+  --surface-rgb: 240 249 255;
+  --accent-rgb: 2 132 199;
+  --accent-color: #0284c7;
+  --accent-gradient: linear-gradient(90deg, #0284c7, #38bdf8);
+  --sheen-rgb: 14 165 233;
+  --pill-border: rgba(14, 165, 233, 0.15);
+  --pill-border-hover: rgba(14, 165, 233, 0.32);
+}
+
+html[data-theme='light'][data-skin='aurora'] {
+  --surface-rgb: 250 245 255;
+  --accent-rgb: 147 51 234;
+  --accent-color: #9333ea;
+  --accent-gradient: linear-gradient(90deg, #9333ea, #c084fc);
+  --sheen-rgb: 168 85 247;
+  --pill-border: rgba(168, 85, 247, 0.15);
+  --pill-border-hover: rgba(168, 85, 247, 0.32);
+}
+
+html[data-theme='light'][data-skin='sunset'] {
+  --surface-rgb: 255 247 237;
+  --accent-rgb: 234 88 12;
+  --accent-color: #ea580c;
+  --accent-gradient: linear-gradient(90deg, #ea580c, #fb923c);
+  --sheen-rgb: 249 115 22;
+  --pill-border: rgba(249, 115, 22, 0.15);
+  --pill-border-hover: rgba(249, 115, 22, 0.32);
+}
+
+html[data-theme='light'][data-skin='forest'] {
+  --surface-rgb: 240 253 244;
+  --accent-rgb: 5 150 105;
+  --accent-color: #059669;
+  --accent-gradient: linear-gradient(90deg, #059669, #34d399);
+  --sheen-rgb: 16 185 129;
+  --pill-border: rgba(16, 185, 129, 0.15);
+  --pill-border-hover: rgba(16, 185, 129, 0.32);
+}
+
+html[data-theme='light'][data-skin='cyber'] {
+  --surface-rgb: 254 252 232;
+  --accent-rgb: 202 138 4;
+  --accent-color: #ca8a04;
+  --accent-gradient: linear-gradient(90deg, #ca8a04, #facc15);
+  --sheen-rgb: 234 179 8;
+  --pill-border: rgba(234, 179, 8, 0.15);
+  --pill-border-hover: rgba(234, 179, 8, 0.32);
 }
 
 /* ===== 模块 Tab(全局):展开面板/设置面板顶部共用的「用量 | 番茄」切换 ===== */
@@ -593,9 +705,9 @@ html[data-theme='light'] {
 }
 
 .tab-btn-active {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #4ade80;
+  background: rgba(var(--accent-rgb) / 0.16);
+  border-color: rgba(var(--accent-rgb) / 0.4);
+  color: var(--accent-color);
 }
 
 /* ===== 药丸基座(全局):用量/番茄两种药丸共用的容器外观 ===== */

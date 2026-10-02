@@ -150,8 +150,8 @@ const resetHighlight = computed<boolean>(() => {
 }
 
 .bar-green {
-  background: linear-gradient(90deg, #15803d, #22c55e);
-  color: #4ade80;
+  background: var(--accent-gradient, linear-gradient(90deg, #15803d, #22c55e));
+  color: var(--accent-color, #4ade80);
 }
 
 .bar-amber {

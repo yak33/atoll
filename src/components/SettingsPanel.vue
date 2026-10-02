@@ -22,9 +22,10 @@ import {
   type GlowEffect,
   type IslandModule,
   type PomodoroSettings,
+  type SkinTheme,
   type ThemeMode,
 } from '../core/appSettings'
-import { setThemeMode } from '../core/theme'
+import { setThemeMode, setSkin, SKIN_OPTIONS } from '../core/theme'
 import type { ZhipuCredential } from '../adapters/zhipu'
 
 const props = defineProps<{
@@ -140,7 +141,15 @@ function applyAppearance(): void {
   document.documentElement.style.setProperty('--bg-alpha', String(appearance.value.opacity))
   // 光效强度同理;种类由 App 传给药丸组件,收回药丸后生效
   document.documentElement.style.setProperty('--glow-strength', String(appearance.value.glowStrength))
+  document.documentElement.dataset.skin = appearance.value.skin
   emit('appearance', { ...appearance.value })
+}
+
+function handleSkin(skin: SkinTheme): void {
+  appearance.value.skin = skin
+  setSkin(skin)
+  applyAppearance()
+  commitAppearance()
 }
 
 /** 切换一种光效:选中则加入池子,取消则移出(全部取消 = 关闭偶发光效) */
@@ -359,6 +368,20 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
+    <div class="field-label" style="margin-top: 2px">皮肤预设</div>
+    <div class="skin-grid">
+      <button
+        v-for="skin in SKIN_OPTIONS"
+        :key="skin.value"
+        :class="['skin-btn', appearance.skin === skin.value ? 'skin-btn-active' : '']"
+        type="button"
+        @click="handleSkin(skin.value)"
+      >
+        <span class="skin-dot" :style="{ background: skin.previewColor }"></span>
+        <span class="skin-name">{{ skin.label }}</span>
+      </button>
+    </div>
+
     <div class="slider-field">
       <div class="slider-head">
         <span class="field-label">不透明度</span>
@@ -539,9 +562,59 @@ onBeforeUnmount(() => {
 }
 
 .theme-btn-active {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #4ade80;
+  background: rgba(var(--accent-rgb) / 0.16);
+  border-color: rgba(var(--accent-rgb) / 0.4);
+  color: var(--accent-color);
+}
+
+/* 皮肤预设选择网格:两行三列 */
+.skin-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skin-btn {
+  flex: 1 0 30%;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.skin-btn:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.skin-btn-active {
+  background: rgba(var(--accent-rgb) / 0.16);
+  border-color: rgba(var(--accent-rgb) / 0.4);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.skin-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px currentColor;
+}
+
+.skin-name {
+  font-size: 11px;
 }
 
 /* 偶发光效:紧凑折叠栏与快捷按钮 */
@@ -576,9 +649,9 @@ onBeforeUnmount(() => {
 }
 
 .glow-action-btn-active {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #4ade80;
+  background: rgba(var(--accent-rgb) / 0.16);
+  border-color: rgba(var(--accent-rgb) / 0.4);
+  color: var(--accent-color);
 }
 
 .glow-groups-box {
@@ -628,9 +701,9 @@ onBeforeUnmount(() => {
 }
 
 .tag-btn-active {
-  background: rgba(34, 197, 94, 0.16);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #4ade80;
+  background: rgba(var(--accent-rgb) / 0.16);
+  border-color: rgba(var(--accent-rgb) / 0.4);
+  color: var(--accent-color);
   font-weight: 600;
 }
 
@@ -656,7 +729,7 @@ onBeforeUnmount(() => {
 .slider {
   width: 100%;
   height: 18px;
-  accent-color: #22c55e;
+  accent-color: var(--accent-color, #22c55e);
   cursor: pointer;
 }
 
@@ -685,7 +758,7 @@ onBeforeUnmount(() => {
 }
 
 .checkbox {
-  accent-color: #22c55e;
+  accent-color: var(--accent-color, #22c55e);
   width: 14px;
   height: 14px;
   cursor: pointer;
@@ -750,7 +823,7 @@ onBeforeUnmount(() => {
 }
 
 .input:focus {
-  border-color: #22c55e;
+  border-color: var(--accent-color, #22c55e);
 }
 
 .section-title {

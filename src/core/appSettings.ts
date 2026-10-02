@@ -64,12 +64,31 @@ export const GLOW_EFFECTS: GlowEffect[] = [
   'sparkle',
 ]
 
-/** 外观自定义:胶囊长度、整体不透明度、偶发光效(读写都会做范围钳制);高度固定不走配置 */
+/** 皮肤主题种类(胶囊底壳色与强调色预设) */
+export type SkinTheme =
+  | 'obsidian'
+  | 'midnight'
+  | 'aurora'
+  | 'sunset'
+  | 'forest'
+  | 'cyber'
+
+export const SKIN_THEMES: SkinTheme[] = [
+  'obsidian',
+  'midnight',
+  'aurora',
+  'sunset',
+  'forest',
+  'cyber',
+]
+
+/** 外观自定义:胶囊长度、整体不透明度、偶发光效、皮肤主题(读写都会做范围钳制);高度固定不走配置 */
 export interface AppearanceSettings {
   pillWidth: number // 180-420,逻辑像素
   opacity: number // 0.5-1
   glowEffects: GlowEffect[] // 偶发光效种类子集
   glowStrength: number // 0.2-1,光效强度系数
+  skin: SkinTheme // 皮肤主题预设
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -77,6 +96,7 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   opacity: 1,
   glowEffects: [...GLOW_EFFECTS],
   glowStrength: 1,
+  skin: 'obsidian',
 }
 
 // 模块级单例:多处 load 同一文件会报资源占用
@@ -186,11 +206,16 @@ export async function loadAppearance(): Promise<AppearanceSettings> {
       } else {
         glowEffects = [...GLOW_EFFECTS]
       }
+      const skin: SkinTheme =
+        typeof raw.skin === 'string' && (SKIN_THEMES as string[]).includes(raw.skin)
+          ? (raw.skin as SkinTheme)
+          : DEFAULT_APPEARANCE.skin
       return {
         pillWidth: clampNumber(raw.pillWidth, 180, 420, DEFAULT_APPEARANCE.pillWidth),
         opacity: clampNumber(raw.opacity, 0.5, 1, DEFAULT_APPEARANCE.opacity),
         glowEffects,
         glowStrength: clampNumber(raw.glowStrength, 0.2, 1, DEFAULT_APPEARANCE.glowStrength),
+        skin,
       }
     }
   } catch {

@@ -7,7 +7,28 @@
  *
  * @author ZHANGCHAO 2026/10/01
  */
-import type { ThemeMode } from './appSettings'
+import type { ThemeMode, SkinTheme } from './appSettings'
+
+/** 皮肤主题选项定义(设置面板与样式层共用) */
+export interface SkinOption {
+  value: SkinTheme
+  label: string
+  previewColor: string
+}
+
+export const SKIN_OPTIONS: SkinOption[] = [
+  { value: 'obsidian', label: '黑曜石', previewColor: '#22c55e' },
+  { value: 'midnight', label: '深海蓝', previewColor: '#0ea5e9' },
+  { value: 'aurora', label: '极光紫', previewColor: '#a855f7' },
+  { value: 'sunset', label: '赤焰橙', previewColor: '#f97316' },
+  { value: 'forest', label: '薄荷绿', previewColor: '#10b981' },
+  { value: 'cyber', label: '钛金金', previewColor: '#eab308' },
+]
+
+/** 切换胶囊皮肤主题(设置面板即时生效,持久化由外观配置负责) */
+export function setSkin(skin: SkinTheme): void {
+  document.documentElement.dataset.skin = skin
+}
 
 let currentMode: ThemeMode = 'auto'
 let mediaQuery: MediaQueryList | null = null

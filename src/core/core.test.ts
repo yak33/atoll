@@ -88,3 +88,22 @@ describe('detectResetNotifications', () => {
     expect(detectResetNotifications(old, fresh, NOW)).toEqual([])
   })
 })
+
+describe('皮肤主题预设 (SkinTheme)', () => {
+  it('默认外观使用黑曜石皮肤 (obsidian)', async () => {
+    const { DEFAULT_APPEARANCE, SKIN_THEMES } = await import('../core/appSettings')
+    expect(DEFAULT_APPEARANCE.skin).toBe('obsidian')
+    expect(SKIN_THEMES).toEqual(['obsidian', 'midnight', 'aurora', 'sunset', 'forest', 'cyber'])
+  })
+
+  it('SKIN_OPTIONS 与 SKIN_THEMES 保持一一对应且包含有效十六进制颜色', async () => {
+    const { SKIN_OPTIONS } = await import('../core/theme')
+    const { SKIN_THEMES } = await import('../core/appSettings')
+
+    expect(SKIN_OPTIONS.map((opt) => opt.value)).toEqual(SKIN_THEMES)
+    SKIN_OPTIONS.forEach((opt) => {
+      expect(opt.previewColor).toMatch(/^#[0-9a-fA-F]{6}$/)
+      expect(opt.label.length).toBeGreaterThan(0)
+    })
+  })
+})

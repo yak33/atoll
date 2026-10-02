@@ -212,7 +212,7 @@ function urgentOf(iso: string | null): boolean {
 }
 
 .bar-green {
-  background: #22c55e;
+  background: var(--accent-gradient, var(--accent-color, #22c55e));
 }
 
 .bar-amber {

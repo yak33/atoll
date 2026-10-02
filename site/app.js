@@ -97,7 +97,19 @@
   }
 
   // ===== 偶发光效：每 8~18s 从池子随机播一种，不连续重复 =====
-  var GLOW_EFFECTS = ['flow', 'ripple', 'sweep', 'dual', 'twin', 'sparkle']
+  var GLOW_EFFECTS = [
+    'flow',
+    'comet',
+    'dual',
+    'clash',
+    'ripple',
+    'sonar',
+    'twin',
+    'aurora',
+    'eclipse',
+    'sweep',
+    'sparkle',
+  ]
 
   function startGlow(target) {
     var lastEffect = ''

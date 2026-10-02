@@ -2,8 +2,8 @@
  * 智谱 GLM Coding Plan 额度接口 adapter。
  *
  * 只做三件事:构造请求 URL / 构造请求头 / 解析响应为统一快照。
- * 纯函数、不碰 UI、不发请求(网络层由 core 在 M1 引入)。
- * 接口行为与解析规则的唯一事实来源:docs/03-智谱额度接口.md
+ * 纯函数、不碰 UI、不发请求(网络层由 core 调度)。
+ * 严格遵循智谱官方接口规范与逆向解析规则。
  *
  * @author ZHANGCHAO 2026/09/30
  */
@@ -145,7 +145,7 @@ function toWindowCandidate(entry: RawLimitEntry): WindowCandidate {
 }
 
 /**
- * 窗口归类(docs/03 §4,顺序敏感):
+ * 窗口归类(顺序敏感):
  * 1. unit 显式分类:3 → 5h,6 → weekly,同槽位先到先得
  * 2. unit 缺失/未识别的兜底:无 reset 的优先归 5h(0% 状态下 5h 桶可能没有
  *    nextResetTime),其余按 reset 升序填入空缺槽位

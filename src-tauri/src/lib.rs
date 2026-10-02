@@ -68,6 +68,19 @@ fn is_foreground_fullscreen() -> bool {
     }
 }
 
+/**
+ * 更新系统托盘悬浮提示文案(Tooltip)。
+ * 由前端在用量刷新或番茄钟状态变化时调用,解决 Windows 托盘悬浮显示空白浮层的问题,
+ * 同时让用户在全屏隐藏时鼠标移动到右下角托盘也能看清当前额度或专注状态。
+ */
+#[tauri::command]
+fn set_tray_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        tray.set_tooltip(Some(tooltip)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -82,7 +95,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .invoke_handler(tauri::generate_handler![is_foreground_fullscreen])
+        .invoke_handler(tauri::generate_handler![is_foreground_fullscreen, set_tray_tooltip])
         .setup(|app| {
             // 托盘:显示/隐藏 + 退出。可见性事件发给前端统一管理,
             // 避免 Rust/JS 两边同时改窗口可见性互相打架。
@@ -92,6 +105,7 @@ pub fn run() {
 
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().expect("未配置窗口图标").clone())
+                .tooltip("atoll · 灵动岛")
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {

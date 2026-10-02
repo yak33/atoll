@@ -12,7 +12,7 @@
  *
  * @author ZHANGCHAO 2026/09/30
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
 import { getCurrentWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
@@ -36,6 +36,7 @@ import { initTheme } from './core/theme'
 import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
+import { updateTrayTooltip } from './core/tray'
 import { startFullscreenWatch } from './core/fullscreenWatch'
 import {
   applyDurations,
@@ -453,6 +454,31 @@ const tooltipText = computed<string>(() => {
     parts.push(`${ERROR_SHORT[quotaError.value.kind]}:${quotaError.value.message}`)
   }
   return parts.join('\n') || '点击打开设置'
+})
+
+// 托盘 Tooltip:根据当前模块及状态实时同步(全屏/隐藏时悬停托盘也能看清实时状态)
+watchEffect(() => {
+  if (activeModule.value === 'usage') {
+    if (credential.value === null) {
+      void updateTrayTooltip('atoll · 点此配置 API Key')
+    } else if (snapshot.value !== null) {
+      const winSummary = (snapshot.value.windows ?? [])
+        .map((w) => `${w.key === 'weekly' ? '7d' : '5h'}: ${Math.round(w.usedPercent)}%`)
+        .join(' | ')
+      void updateTrayTooltip(`atoll · ${winSummary || '已连接'}`)
+    } else if (quotaError.value !== null) {
+      void updateTrayTooltip(`atoll · 智谱额度 [${ERROR_SHORT[quotaError.value.kind] || '异常'}]`)
+    } else {
+      void updateTrayTooltip('atoll · 正在加载额度…')
+    }
+  } else {
+    const p = pomoView.value
+    if (p.running) {
+      void updateTrayTooltip(`atoll · ${p.phase === 'work' ? '🍅 专注' : '☕ 休息'} ${p.remainText}`)
+    } else {
+      void updateTrayTooltip(`atoll · 🍅 番茄钟 (${p.stateText || '就绪'})`)
+    }
+  }
 })
 </script>
 

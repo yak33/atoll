@@ -19,6 +19,9 @@ const props = defineProps<{
   text: string
   hasError: boolean
   tooltip: string
+  /** 告警阈值(百分点,设置面板可配):>=criticalAt 红色脉冲,>=warnAt 琥珀 */
+  warnAt: number
+  criticalAt: number
   /** 偶发光效种类(设置面板可配);空数组 = 不播放 */
   glowEffects: GlowEffect[]
 }>()
@@ -27,19 +30,19 @@ const emit = defineEmits<{ click: []; mouseenter: []; wheel: [event?: WheelEvent
 
 const { actionName } = useGlowEffects(() => props.glowEffects)
 
-// 告警等级决定药丸本身的配色(PRD §4.3):>=90 红色脉冲,>=75 琥珀
+// 告警等级决定药丸本身的配色:阈值由设置传入(默认 75/90)
 const alertClass = computed<string>(() => {
   if (props.win === null) return ''
-  if (props.win.usedPercent >= 90) return 'island-red'
-  if (props.win.usedPercent >= 75) return 'island-amber'
+  if (props.win.usedPercent >= props.criticalAt) return 'island-red'
+  if (props.win.usedPercent >= props.warnAt) return 'island-amber'
   return ''
 })
 
-// 进度条配色:>=90 红,>=75 琥珀,否则绿
+// 进度条配色跟随同一组阈值
 const barClass = computed<string>(() => {
   if (props.win === null) return 'bar-green'
-  if (props.win.usedPercent >= 90) return 'bar-red'
-  if (props.win.usedPercent >= 75) return 'bar-amber'
+  if (props.win.usedPercent >= props.criticalAt) return 'bar-red'
+  if (props.win.usedPercent >= props.warnAt) return 'bar-amber'
   return 'bar-green'
 })
 

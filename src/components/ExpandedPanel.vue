@@ -9,7 +9,7 @@
 import type { QuotaError } from '../types'
 import { formatReset, resetUrgent } from '../composables/nowTick'
 
-defineProps<{
+const props = defineProps<{
   windows: { key: '5h' | 'weekly'; usedPercent: number; resetAt: string | null }[]
   planLevel: string
   source: 'tokens_limit' | 'credit_limit'
@@ -18,6 +18,11 @@ defineProps<{
   refreshing: boolean
   /** 当前模块:用量面板恒收 'usage',用于 Tab 高亮 */
   activeModule: 'usage' | 'pomodoro'
+  /** 告警阈值(百分点,设置面板可配) */
+  warnAt: number
+  criticalAt: number
+  /** 5h 窗口消耗速率预测文案;空串 = 样本不足/不可信,不渲染 */
+  burnEstimate: string
 }>()
 
 const emit = defineEmits<{
@@ -58,8 +63,8 @@ function onPanelMouseUp(): void {
 }
 
 function barClass(percent: number): string {
-  if (percent >= 90) return 'bar-red'
-  if (percent >= 75) return 'bar-amber'
+  if (percent >= props.criticalAt) return 'bar-red'
+  if (percent >= props.warnAt) return 'bar-amber'
   return 'bar-green'
 }
 
@@ -107,6 +112,8 @@ function urgentOf(iso: string | null): boolean {
       <span class="win-percent">{{ Math.round(win.usedPercent) }}%</span>
       <span :class="['win-reset', urgentOf(win.resetAt) ? 'win-reset-urgent' : '']">{{ resetTextOf(win.resetAt) || '-' }}</span>
     </div>
+
+    <div v-if="burnEstimate !== ''" class="burn-line" title="基于最近两次轮询的粗略估算">{{ burnEstimate }}</div>
 
     <div v-if="error" class="error-line" :title="error.message">{{ error.message }}</div>
 
@@ -242,6 +249,12 @@ function urgentOf(iso: string | null): boolean {
 .win-reset-urgent {
   color: #f59e0b;
   font-weight: 700;
+}
+
+/* 5h 消耗速率预测行:弱化展示,粗估语义 */
+.burn-line {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
 .error-line {

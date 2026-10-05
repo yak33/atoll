@@ -7,7 +7,8 @@
  */
 import type { ZhipuQuotaSnapshot } from '../types'
 
-/** 告警阈值(PRD §4.3):低于该值视为恢复正常 */
+/** 重置探测分界:固定 75,刻意不跟随用户可配的告警阈值(warnAt)——
+ *  「从高位骤降」是物理事实,与「用户想被提醒的分寸」是两回事,解耦最稳 */
 const ALERT_THRESHOLD = 75
 
 function windowLabel(key: string): string {

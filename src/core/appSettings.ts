@@ -186,6 +186,48 @@ export async function savePomodoro(settings: PomodoroSettings): Promise<void> {
   await store.save()
 }
 
+/** 用量告警阈值(百分点);warnAt 必须 < criticalAt,读取时做交叉钳制 */
+export interface UsageAlerts {
+  warnAt: number // 50-97,琥珀留意
+  criticalAt: number // 51-99,红色告警
+}
+
+export const DEFAULT_USAGE_ALERTS: UsageAlerts = { warnAt: 75, criticalAt: 90 }
+
+/** 钳制到合法范围并保证 warn < critical(设置面板拖动联动也复用此函数) */
+export function normalizeUsageAlerts(warnAt: number, criticalAt: number): UsageAlerts {
+  const warn = Math.round(Math.min(97, Math.max(50, warnAt)))
+  const critical = Math.round(Math.min(99, Math.max(51, criticalAt)))
+  if (warn >= critical) {
+    // 谁越界改谁:warn 顶到上限就压 critical 上移,反之压 warn 下移
+    if (warn >= 97) return { warnAt: 97, criticalAt: 98 }
+    return { warnAt: warn, criticalAt: warn + 1 }
+  }
+  return { warnAt: warn, criticalAt: critical }
+}
+
+export async function loadUsageAlerts(): Promise<UsageAlerts> {
+  try {
+    const store = await getStore()
+    const raw = await store.get<Partial<UsageAlerts>>('usage_alerts')
+    if (raw !== null && typeof raw === 'object') {
+      return normalizeUsageAlerts(
+        clampNumber(raw.warnAt, 50, 97, DEFAULT_USAGE_ALERTS.warnAt),
+        clampNumber(raw.criticalAt, 51, 99, DEFAULT_USAGE_ALERTS.criticalAt),
+      )
+    }
+  } catch {
+    // 读取失败回落默认
+  }
+  return { ...DEFAULT_USAGE_ALERTS }
+}
+
+export async function saveUsageAlerts(alerts: UsageAlerts): Promise<void> {
+  const store = await getStore()
+  await store.set('usage_alerts', normalizeUsageAlerts(alerts.warnAt, alerts.criticalAt))
+  await store.save()
+}
+
 /** 读取外观设置;存储缺字段或越界时逐项钳制/回落默认 */
 export async function loadAppearance(): Promise<AppearanceSettings> {
   try {

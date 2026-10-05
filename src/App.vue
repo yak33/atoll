@@ -23,6 +23,7 @@ import {
   loadPillPosition,
   loadPomodoro,
   loadTheme,
+  loadUsageAlerts,
   saveActiveModule,
   saveCredential,
   savePillPosition,
@@ -30,8 +31,11 @@ import {
   type IslandModule,
   type PillPosition,
   type PomodoroSettings,
+  type UsageAlerts,
   DEFAULT_APPEARANCE,
+  DEFAULT_USAGE_ALERTS,
 } from './core/appSettings'
+import { estimateHoursToLimit, formatBurnEstimate, type BurnSample } from './core/burnRate'
 import { initTheme } from './core/theme'
 import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
@@ -214,9 +218,28 @@ let stopFullscreenWatch: (() => void) | null = null
 let disposeTheme: (() => void) | null = null
 let unlistenFocus: (() => void) | null = null
 
+// ===== 用量告警阈值 + 消耗速率预测 =====
+const usageAlerts = ref<UsageAlerts>({ ...DEFAULT_USAGE_ALERTS })
+let lastBurnSample: BurnSample | null = null
+const burnEstimateText = ref('')
+
+function handleUsageAlerts(next: UsageAlerts): void {
+  usageAlerts.value = next
+}
+
 const poller = new QuotaPoller({
   onData: (data) => {
     const messages = detectResetNotifications(lastSnapshot, data, Date.now())
+    // 5h 窗口消耗速率采样:相邻两次快照算斜率,供展开面板「预计耗尽」粗估
+    // (负斜率=窗口重置,estimateHoursToLimit 判不可信返回 null)
+    const window5h = data.windows.find((w) => w.key === '5h')
+    if (window5h !== undefined) {
+      const sample = { at: Date.now(), usedPercent: window5h.usedPercent }
+      if (lastBurnSample !== null) {
+        burnEstimateText.value = formatBurnEstimate(estimateHoursToLimit(lastBurnSample, sample))
+      }
+      lastBurnSample = sample
+    }
     lastSnapshot = data
     snapshot.value = data
     quotaError.value = null
@@ -238,6 +261,7 @@ onMounted(async () => {
   // 番茄钟时长从持久化配置初始化
   const pomoCfg = await loadPomodoro()
   pomo.value = initialPomodoro(pomoCfg.workMin * 60_000, pomoCfg.breakMin * 60_000)
+  usageAlerts.value = await loadUsageAlerts()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -492,6 +516,8 @@ watchEffect(() => {
       :text="pillText"
       :has-error="quotaError !== null"
       :tooltip="tooltipText"
+      :warn-at="usageAlerts.warnAt"
+      :critical-at="usageAlerts.criticalAt"
       :glow-effects="appearance.glowEffects"
       @click="openSettings"
       @mouseenter="handlePillHover"
@@ -519,6 +545,9 @@ watchEffect(() => {
     :error="quotaError"
     :refreshing="refreshing"
     :active-module="activeModule"
+    :warn-at="usageAlerts.warnAt"
+    :critical-at="usageAlerts.criticalAt"
+    :burn-estimate="burnEstimateText"
     @refresh="handleRefresh"
     @settings="openSettings"
     @mouseenter="cancelCollapse"
@@ -547,6 +576,7 @@ watchEffect(() => {
     @close="closeSettings"
     @appearance="handleAppearance"
     @pomo-durations="handlePomoDurations"
+    @usage-alerts="handleUsageAlerts"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"
   />

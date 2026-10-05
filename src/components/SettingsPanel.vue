@@ -12,11 +12,15 @@ import {
   loadAppearance,
   loadPomodoro,
   loadTheme,
+  loadUsageAlerts,
   saveAppearance,
   savePomodoro,
   saveTheme,
+  saveUsageAlerts,
+  normalizeUsageAlerts,
   DEFAULT_APPEARANCE,
   DEFAULT_POMODORO,
+  DEFAULT_USAGE_ALERTS,
   GLOW_EFFECTS,
   type AppearanceSettings,
   type GlowEffect,
@@ -24,6 +28,7 @@ import {
   type PomodoroSettings,
   type SkinTheme,
   type ThemeMode,
+  type UsageAlerts,
 } from '../core/appSettings'
 import { setThemeMode, setSkin, SKIN_OPTIONS } from '../core/theme'
 import type { ZhipuCredential } from '../adapters/zhipu'
@@ -38,6 +43,7 @@ const emit = defineEmits<{
   save: [credential: ZhipuCredential]
   appearance: [settings: AppearanceSettings]
   pomoDurations: [settings: PomodoroSettings]
+  usageAlerts: [settings: UsageAlerts]
   resetPosition: []
   dragstart: []
   close: []
@@ -188,11 +194,28 @@ async function commitPomoDurations(): Promise<void> {
   }
 }
 
+// 用量告警阈值:拖动实时 emit(药丸即时变色),松手落盘;normalize 保证 warn < critical
+const alerts = ref<UsageAlerts>({ ...DEFAULT_USAGE_ALERTS })
+
+function applyAlerts(): void {
+  alerts.value = normalizeUsageAlerts(alerts.value.warnAt, alerts.value.criticalAt)
+  emit('usageAlerts', { ...alerts.value })
+}
+
+async function commitAlerts(): Promise<void> {
+  try {
+    await saveUsageAlerts(alerts.value)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
 onMounted(async () => {
   settingsTab.value = props.activeModule === 'pomodoro' ? 'pomodoro' : 'usage'
   themeMode.value = await loadTheme()
   appearance.value = await loadAppearance()
   pomoCfg.value = await loadPomodoro()
+  alerts.value = await loadUsageAlerts()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -315,6 +338,41 @@ onBeforeUnmount(() => {
         <input v-model="projectId" type="text" class="input" placeholder="bigmodel-project" autocomplete="off" />
       </label>
       <span class="field-hint">团队版必填组织 ID,否则官方返回「当前用户不存在coding plan」</span>
+
+      <div class="section-title">告警阈值</div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">琥珀留意</span>
+          <span class="slider-value">≥ {{ alerts.warnAt }}%</span>
+        </div>
+        <input
+          v-model.number="alerts.warnAt"
+          type="range"
+          class="slider"
+          min="50"
+          max="97"
+          step="1"
+          @input="applyAlerts"
+          @change="commitAlerts"
+        />
+      </div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">红色告警</span>
+          <span class="slider-value">≥ {{ alerts.criticalAt }}%</span>
+        </div>
+        <input
+          v-model.number="alerts.criticalAt"
+          type="range"
+          class="slider"
+          min="51"
+          max="99"
+          step="1"
+          @input="applyAlerts"
+          @change="commitAlerts"
+        />
+      </div>
+      <span class="field-hint">用量达到阈值时药丸变色并脉冲;红色必须大于琥珀,拖动时自动互相让位</span>
     </template>
 
     <!-- ===== 番茄钟模块设置 ===== -->

@@ -26,7 +26,7 @@ const props = defineProps<{
   glowEffects: GlowEffect[]
 }>()
 
-const emit = defineEmits<{ click: []; mouseenter: []; wheel: [event?: WheelEvent] }>()
+const emit = defineEmits<{ click: []; mouseenter: []; mouseleave: []; wheel: [event?: WheelEvent] }>()
 
 const { actionName } = useGlowEffects(() => props.glowEffects)
 
@@ -63,6 +63,7 @@ const resetHighlight = computed<boolean>(() => {
     :title="tooltip"
     @click="emit('click')"
     @mouseenter="emit('mouseenter')"
+    @mouseleave="emit('mouseleave')"
     @wheel.prevent="emit('wheel', $event)"
   >
     <template v-if="win">

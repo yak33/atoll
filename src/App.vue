@@ -124,6 +124,8 @@ const wheelDirection = ref<'down' | 'up'>('down')
 
 /** 环形切换:注册表顺序即环形顺序,向下滚取下一个,向上滚取上一个 */
 function handlePillWheel(event?: WheelEvent): void {
+  // 滚动滚轮时取消展开定时器,让滚轮顺畅连续切模块而不被突然展开打断
+  cancelExpand()
   const now = Date.now()
   if (now - lastWheelSwitch < 400) return
   lastWheelSwitch = now
@@ -340,6 +342,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  cancelExpand()
   cancelCollapse()
   cancelBlurClose()
   poller.stop()
@@ -369,10 +372,33 @@ async function enterMode(target: IslandMode): Promise<void> {
   }
 }
 
-async function handlePillHover(): Promise<void> {
-  if (mode.value !== 'pill') return
+/** 鼠标在药丸上停留超过该延迟才展开,防止轻划掠过或滚轮切模块时误触展开 */
+const EXPAND_DELAY_MS = 250
+let expandTimer: number | null = null
+
+function scheduleExpand(): void {
+  cancelExpand()
   cancelCollapse()
-  await enterMode('expanded')
+  expandTimer = window.setTimeout(() => {
+    expandTimer = null
+    void enterMode('expanded')
+  }, EXPAND_DELAY_MS)
+}
+
+function cancelExpand(): void {
+  if (expandTimer !== null) {
+    clearTimeout(expandTimer)
+    expandTimer = null
+  }
+}
+
+function handlePillHover(): void {
+  if (mode.value !== 'pill') return
+  scheduleExpand()
+}
+
+function handlePillLeave(): void {
+  cancelExpand()
 }
 
 function scheduleCollapse(): void {
@@ -390,6 +416,7 @@ function cancelCollapse(): void {
 }
 
 async function openSettings(): Promise<void> {
+  cancelExpand()
   cancelCollapse()
   await enterMode('settings')
 }
@@ -582,10 +609,18 @@ const panelEvents = computed<Record<string, unknown>>(() => {
 <template>
   <!-- 收起态:注册表动态挂载药丸;滚轮环形切换模块(推拉滑屏),悬停展开,点击设置 -->
   <Transition v-if="mode === 'pill'" :name="'pill-slide-' + wheelDirection" mode="out-in">
-    <component :is="moduleDef.pill" :key="moduleDef.id" v-bind="pillProps" @click="openSettings" @mouseenter="handlePillHover" @wheel="handlePillWheel" />
+    <component
+      :is="moduleDef.pill"
+      :key="moduleDef.id"
+      v-bind="pillProps"
+      @click="openSettings"
+      @mouseenter="handlePillHover"
+      @mouseleave="handlePillLeave"
+      @wheel="handlePillWheel"
+    />
   </Transition>
 
-  <!-- 展开态:注册表动态挂载面板;Tab 切换,模块特有事件由 panelEvents 组装 -->
+  <!-- 展开态:注册表动态挂载面板;Tab 切换,滚轮切模块,模块特有事件由 panelEvents 组装 -->
   <component
     v-else-if="mode === 'expanded'"
     :is="moduleDef.panel"
@@ -595,6 +630,7 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @mouseleave="scheduleCollapse"
     @dragstart="handleDragStart"
     @switch-module="handleSwitchModule"
+    @wheel.prevent="handlePillWheel"
   />
 
   <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->

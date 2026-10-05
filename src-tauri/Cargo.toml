@@ -1,6 +1,6 @@
 [package]
 name = "atoll"
-version = "0.2.7"
+version = "0.2.8"
 description = "Windows 桌面灵动岛悬浮组件"
 authors = ["ZHANGCHAO"]
 edition = "2021"

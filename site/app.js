@@ -53,11 +53,13 @@
     })
   }
 
-  // ===== 首屏药丸展开：结构变化模仿真实产品（窗口硬切 + 面板 200ms 入场） =====
+  // ===== 首屏药丸展开：模仿真实产品(250ms 悬停意图判定 + 500ms 离开延迟收回) =====
   var desk = document.querySelector('[data-desk]')
   var pill = document.getElementById('demo-pill')
   var panel = document.getElementById('demo-panel')
+  var EXPAND_DELAY_MS = 250
   var COLLAPSE_DELAY_MS = 500
+  var expandTimer = 0
   var collapseTimer = 0
 
   function openDemo() {
@@ -71,17 +73,35 @@
     pill.setAttribute('aria-expanded', 'false')
   }
 
-  /** 离开药丸后延迟收回，与产品里防误触抖动的 500ms 一致 */
+  function scheduleOpen() {
+    window.clearTimeout(collapseTimer)
+    window.clearTimeout(expandTimer)
+    expandTimer = window.setTimeout(openDemo, EXPAND_DELAY_MS)
+  }
+
+  /** 离开面板后延迟收回，与产品里防误触抖动的 500ms 一致 */
   function scheduleClose() {
+    window.clearTimeout(expandTimer)
     window.clearTimeout(collapseTimer)
     collapseTimer = window.setTimeout(closeDemo, COLLAPSE_DELAY_MS)
   }
 
   if (desk !== null && pill !== null && panel !== null) {
-    pill.addEventListener('mouseenter', openDemo)
+    pill.addEventListener('mouseenter', scheduleOpen)
+    pill.addEventListener('mouseleave', function () {
+      window.clearTimeout(expandTimer)
+    })
+    desk.addEventListener('mouseenter', function () {
+      window.clearTimeout(collapseTimer)
+    })
     desk.addEventListener('mouseleave', scheduleClose)
+    pill.addEventListener('wheel', function (e) {
+      e.preventDefault()
+      window.clearTimeout(expandTimer)
+    })
     // 触屏没有 hover，点击与键盘走展开/收起
     pill.addEventListener('click', function () {
+      window.clearTimeout(expandTimer)
       if (desk.classList.contains('open')) {
         closeDemo()
       } else {

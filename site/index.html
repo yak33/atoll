@@ -57,8 +57,8 @@
     <h1>额度还剩多少，<br />瞟一眼就知道。</h1>
     <p class="lede">atoll 是钉在 Windows 屏幕顶部的灵动岛组件：智谱 GLM Coding Plan 的 5 小时与 7 天滚动用量、重置倒计时、限额告警，收进一颗 44 像素的药丸。</p>
     <div class="hero-cta">
-      <a class="btn-primary" href="https://github.com/yak33/atoll/releases/download/v0.2.5/atoll_0.2.5_x64-setup.exe">下载 Windows 版</a>
-      <a class="btn-secondary" href="https://github.com/yak33/atoll/releases/tag/v0.2.5">v0.2.5 更新说明</a>
+      <a class="btn-primary" href="https://github.com/yak33/atoll/releases/download/v0.2.8/atoll_0.2.8_x64-setup.exe">下载 Windows 版</a>
+      <a class="btn-secondary" href="https://github.com/yak33/atoll/releases/tag/v0.2.8">v0.2.8 更新说明</a>
     </div>
     <p class="hero-meta">2.86 MiB · Windows 10 / 11 免管理员安装</p>
   </div>
@@ -91,6 +91,18 @@
         <span class="win-percent">12%</span>
         <span class="win-reset">1d 9h</span>
       </div>
+      <!-- 24h 趋势:5h 强调线 + 7d 弱化线 -->
+      <div class="trend-block" title="近 24 小时用量走势(左端 = 24 小时前)">
+        <div class="trend-head">
+          <span class="trend-label">24h 趋势</span>
+          <span class="trend-legend"><i class="dot dot-5h"></i>5h<i class="dot dot-7d"></i>7d</span>
+        </div>
+        <svg class="trend-svg" viewBox="0 0 300 44" preserveAspectRatio="none">
+          <polyline class="line-7d" points="0,38 30,36 60,34 90,33 120,31 150,28 180,26 210,23 240,21 270,19 300,17" />
+          <polyline class="line-5h" points="0,40 30,38 60,35 90,32 110,25 130,42 160,36 190,30 220,22 250,18 280,14 300,12" />
+        </svg>
+      </div>
+      <div class="burn-line" title="基于最近两次轮询的粗略估算">按当前速度预计 3.2 小时后耗尽</div>
       <div class="panel-footer">
         <span class="fetched">更新于 刚刚</span>
         <div class="footer-actions">
@@ -100,7 +112,7 @@
       </div>
     </div>
 
-    <div class="desk-hint">悬停或点击药丸即可展开</div>
+    <div class="desk-hint">悬停 250ms 展开 · 滚轮快速切模块</div>
   </div>
 </section>
 
@@ -117,7 +129,7 @@
       </div>
       <div class="state-text">
         <h3>收起态</h3>
-        <p>260 × 44 像素，只显示当前最紧张的那一档。不挡内容、不抢焦点、不出现在任务栏。</p>
+        <p>260 × 44 像素，只显示当前最紧张的那一档。鼠标滚轮上下滑动秒切模块；不挡内容、不抢焦点、不出现在任务栏。</p>
       </div>
     </article>
 
@@ -131,7 +143,7 @@
       </div>
       <div class="state-text">
         <h3>展开态</h3>
-        <p>鼠标悬停即展开两档完整进度条、套餐档位与最后查询时间。离开半秒后自动收回，防止误触抖动。</p>
+        <p>鼠标悬停 250ms 即展开两档完整进度条、24h 趋势折线、速率预估与套餐档位。离开半秒后自动收回，防止误触抖动。</p>
       </div>
     </article>
 
@@ -165,6 +177,17 @@
         </div>
         <div class="win-row"><span class="win-label">5h</span><div class="win-track"><div class="win-fill bar-amber" style="width:78%"></div></div><span class="win-percent">78%</span><span class="win-reset">52m</span></div>
         <div class="win-row"><span class="win-label">7d</span><div class="win-track"><div class="win-fill bar-green" style="width:41%"></div></div><span class="win-percent">41%</span><span class="win-reset">2d 06h</span></div>
+        <div class="trend-block" title="近 24 小时用量走势">
+          <div class="trend-head">
+            <span class="trend-label">24h 趋势</span>
+            <span class="trend-legend"><i class="dot dot-5h"></i>5h<i class="dot dot-7d"></i>7d</span>
+          </div>
+          <svg class="trend-svg" viewBox="0 0 300 44" preserveAspectRatio="none">
+            <polyline class="line-7d" points="0,35 40,34 80,31 120,29 160,27 200,24 240,22 280,20 300,18" />
+            <polyline class="line-5h" points="0,38 40,34 70,30 90,42 120,38 160,32 200,26 240,20 270,16 300,10" />
+          </svg>
+        </div>
+        <div class="burn-line">按当前速度预计 1.8 小时后耗尽</div>
         <div class="error-line">网络异常：请求超时</div>
         <div class="panel-footer">
           <span class="fetched">更新于 3 分钟前</span>
@@ -177,6 +200,9 @@
       <p>直连智谱官方额度接口，读 5 小时与 7 天两个滚动窗口的已用百分比和下次重置时间。</p>
       <ul class="fact-list">
         <li>倒计时纯本地计算，不产生任何网络请求</li>
+        <li>24 小时用量走势折线（5h 强调线 + 7d 弱化线），轮询快照自动落盘持久化</li>
+        <li>相邻快照动态测算消耗速率，预估还可支撑时长</li>
+        <li>两档告警阈值支持在设置面板自定义调节（琥珀 / 红色联动交叉钳制）</li>
         <li>每 5 分钟拉一次，带随机抖动，失败按 1 到 10 分钟指数退避</li>
         <li>接口是非公开文档的，字段可能变：全部容错集中在适配器一层</li>
         <li>团队版组织 ID 与项目 ID 已支持</li>
@@ -219,7 +245,7 @@
 <section class="alert" id="alert">
   <div class="alert-head">
     <h2>快到限额时，它自己变色。</h2>
-    <p>阈值取业内通行约定。配色只有三档，不需要读数字就知道该不该收着用手。</p>
+    <p>默认 75% 琥珀留意、90% 红色告警并呼吸脉冲，两档阈值均可在设置中按个人习惯自由拖动调节。</p>
   </div>
 
   <div class="scale reveal">
@@ -287,7 +313,7 @@
     <div><dt>安装包体积</dt><dd>2.86<span> MiB</span></dd></div>
     <div><dt>常驻内存</dt><dd>138<span> MB</span></dd></div>
     <div><dt>自动轮询</dt><dd>5<span> 分钟 / 次 + 随机抖动</span></dd></div>
-    <div><dt>单元测试</dt><dd>38<span> 个</span></dd></div>
+    <div><dt>单元测试</dt><dd>55<span> 个</span></dd></div>
   </dl>
   <p class="metrics-note">内存是任务管理器「私有工作集」口径的实测值。Tauri 主进程约 30 MB，其余是 WebView2 多进程底噪，每个进程约 18 MB，空页面同理。</p>
 </section>
@@ -297,7 +323,7 @@
   <div class="download-cta reveal">
     <h2>装上就能用。</h2>
     <p>下载安装包，双击安装，打开后点药丸进设置填 API Key。</p>
-    <a class="btn-primary btn-lg" href="https://github.com/yak33/atoll/releases/download/v0.2.5/atoll_0.2.5_x64-setup.exe">下载 atoll_0.2.5_x64-setup.exe</a>
+    <a class="btn-primary btn-lg" href="https://github.com/yak33/atoll/releases/download/v0.2.8/atoll_0.2.8_x64-setup.exe">下载 atoll_0.2.8_x64-setup.exe</a>
     <a class="text-link" href="https://github.com/yak33/atoll/releases">查看全部版本</a>
   </div>
   <div class="download-req">

@@ -14,6 +14,8 @@ import IslandPill from './components/IslandPill.vue'
 import ExpandedPanel from './components/ExpandedPanel.vue'
 import PomodoroPill from './components/PomodoroPill.vue'
 import PomodoroPanel from './components/PomodoroPanel.vue'
+import ClipboardPill from './components/ClipboardPill.vue'
+import ClipboardPanel from './components/ClipboardPanel.vue'
 
 export interface IslandModuleDefinition {
   id: IslandModule
@@ -44,5 +46,13 @@ export const ISLAND_MODULES: IslandModuleDefinition[] = [
     panel: PomodoroPanel,
     // 内容少,固定小尺寸
     expandedSize: () => new LogicalSize(280, 250),
+  },
+  {
+    id: 'clipboard',
+    label: '剪贴',
+    pill: ClipboardPill,
+    panel: ClipboardPanel,
+    // 列表面板:中等尺寸,内容滚动
+    expandedSize: () => new LogicalSize(320, 380),
   },
 ]

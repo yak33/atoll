@@ -7,6 +7,7 @@
  * @author ZHANGCHAO 2026/10/01
  */
 import ModuleTabs from './ModuleTabs.vue'
+import type { IslandModule } from '../core/appSettings'
 
 defineProps<{
   /** 阶段/剩余文本由 App 按秒算好传入;workMin/breakMin 供提示文案插值 */
@@ -18,7 +19,7 @@ defineProps<{
     workMin: number
     breakMin: number
   }
-  activeModule: 'usage' | 'pomodoro'
+  activeModule: IslandModule
 }>()
 
 const emit = defineEmits<{
@@ -27,7 +28,7 @@ const emit = defineEmits<{
   dragstart: []
   pomoToggle: []
   pomoReset: []
-  switchModule: [module: 'usage' | 'pomodoro']
+  switchModule: [module: IslandModule]
 }>()
 
 // ===== 整面板拖动移动窗口:位移超过阈值才算拖动;按钮上按下不参与 =====

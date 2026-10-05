@@ -10,6 +10,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   loadAppearance,
+  loadClipboardEnabled,
   loadPomodoro,
   loadTheme,
   loadUsageAlerts,
@@ -44,6 +45,8 @@ const emit = defineEmits<{
   appearance: [settings: AppearanceSettings]
   pomoDurations: [settings: PomodoroSettings]
   usageAlerts: [settings: UsageAlerts]
+  clipboardEnabled: [enabled: boolean]
+  clipboardClear: []
   resetPosition: []
   dragstart: []
   close: []
@@ -177,7 +180,7 @@ async function commitAppearance(): Promise<void> {
 }
 
 // 模块设置 Tab:初始跟随当前激活模块,面板内切换不影响药丸
-const settingsTab = ref<'usage' | 'pomodoro'>('usage')
+const settingsTab = ref<IslandModule>('usage')
 
 // 番茄钟时长(分钟):拖动实时 emit(未运行时药丸立即变化),松手落盘
 const pomoCfg = ref<PomodoroSettings>({ ...DEFAULT_POMODORO })
@@ -197,6 +200,14 @@ async function commitPomoDurations(): Promise<void> {
 // 用量告警阈值:拖动实时 emit(药丸即时变色),松手落盘;normalize 保证 warn < critical
 const alerts = ref<UsageAlerts>({ ...DEFAULT_USAGE_ALERTS })
 
+// 剪贴板记录开关:切换即生效并落盘(隐私急停)
+const clipboardOn = ref(true)
+
+function handleClipboardToggle(enabled: boolean): void {
+  clipboardOn.value = enabled
+  emit('clipboardEnabled', enabled)
+}
+
 function applyAlerts(): void {
   alerts.value = normalizeUsageAlerts(alerts.value.warnAt, alerts.value.criticalAt)
   emit('usageAlerts', { ...alerts.value })
@@ -211,11 +222,12 @@ async function commitAlerts(): Promise<void> {
 }
 
 onMounted(async () => {
-  settingsTab.value = props.activeModule === 'pomodoro' ? 'pomodoro' : 'usage'
+  settingsTab.value = props.activeModule
   themeMode.value = await loadTheme()
   appearance.value = await loadAppearance()
   pomoCfg.value = await loadPomodoro()
   alerts.value = await loadUsageAlerts()
+  clipboardOn.value = await loadClipboardEnabled()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -313,6 +325,7 @@ onBeforeUnmount(() => {
     <div class="module-tabs">
       <button :class="['tab-btn', settingsTab === 'usage' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'usage'">用量</button>
       <button :class="['tab-btn', settingsTab === 'pomodoro' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'pomodoro'">番茄</button>
+      <button :class="['tab-btn', settingsTab === 'clipboard' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'clipboard'">剪贴</button>
     </div>
 
     <!-- ===== 用量模块设置 ===== -->
@@ -376,7 +389,7 @@ onBeforeUnmount(() => {
     </template>
 
     <!-- ===== 番茄钟模块设置 ===== -->
-    <template v-else>
+    <template v-else-if="settingsTab === 'pomodoro'">
       <div class="slider-field">
         <div class="slider-head">
           <span class="field-label">工作时长</span>
@@ -410,6 +423,24 @@ onBeforeUnmount(() => {
         />
       </div>
       <span class="field-hint">进行中的阶段按原时长走完,下一阶段生效;重置立即应用当前配置</span>
+    </template>
+
+    <!-- ===== 剪贴板模块设置 ===== -->
+    <template v-else-if="settingsTab === 'clipboard'">
+      <label class="toggle-row">
+        <input
+          :checked="clipboardOn"
+          type="checkbox"
+          class="checkbox"
+          @change="handleClipboardToggle(($event.target as HTMLInputElement).checked)"
+        />
+        <span class="field-label">记录剪贴板历史</span>
+      </label>
+      <span class="field-hint">
+        仅记录纯文本(图像/文件忽略),重复复制自动去重置顶;上限 200 条,置顶条目豁免淘汰。
+        数据只保存在本机,不联网不上传。敏感内容建议及时删除或关闭记录。
+      </span>
+      <button class="reset-pos-btn" type="button" @click="emit('clipboardClear')">清空全部历史(含置顶)</button>
     </template>
 
     <!-- ===== 公共区:外观 / 胶囊 / 系统 ===== -->

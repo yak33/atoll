@@ -11,6 +11,7 @@ import type { QuotaError } from '../types'
 import { formatReset, resetUrgent, nowTick } from '../composables/nowTick'
 import { sparklinePoints, type UsageHistoryPoint } from '../core/usageHistory'
 import ModuleTabs from './ModuleTabs.vue'
+import type { IslandModule } from '../core/appSettings'
 
 const props = defineProps<{
   windows: { key: '5h' | 'weekly'; usedPercent: number; resetAt: string | null }[]
@@ -20,7 +21,7 @@ const props = defineProps<{
   error: QuotaError | null
   refreshing: boolean
   /** 当前模块:用量面板恒收 'usage',用于 Tab 高亮 */
-  activeModule: 'usage' | 'pomodoro'
+  activeModule: IslandModule
   /** 告警阈值(百分点,设置面板可配) */
   warnAt: number
   criticalAt: number
@@ -36,7 +37,7 @@ const emit = defineEmits<{
   mouseenter: []
   mouseleave: []
   dragstart: []
-  switchModule: [module: 'usage' | 'pomodoro']
+  switchModule: [module: IslandModule]
 }>()
 
 // ===== 整面板拖动移动窗口:位移超过阈值才算拖动;按钮上按下不参与 =====

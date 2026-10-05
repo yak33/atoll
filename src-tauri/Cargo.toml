@@ -1,6 +1,6 @@
 [package]
 name = "atoll"
-version = "0.2.8"
+version = "0.2.9"
 description = "Windows 桌面灵动岛悬浮组件"
 authors = ["ZHANGCHAO"]
 edition = "2021"
@@ -28,6 +28,9 @@ windows-sys = { version = "0.59", features = [
     "Win32_Graphics_Gdi",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+# 剪贴板模块:watcher 走 Win32 消息事件驱动,读写文本一体化
+clipboard-rs = "0.3"
 
 [profile.release]
 # 常驻小组件,优先体积与启动速度

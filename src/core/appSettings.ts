@@ -8,20 +8,21 @@
 import { load } from '@tauri-apps/plugin-store'
 import type { ZhipuCredential } from '../adapters/zhipu'
 import type { UsageHistoryPoint } from './usageHistory'
+import type { ClipboardItem } from './clipboardHistory'
 
 const STORE_FILE = 'settings.json'
 const CREDENTIAL_KEY = 'zhipu_credential'
 const THEME_KEY = 'theme'
 const ACTIVE_MODULE_KEY = 'active_module'
 
-/** 当前激活的灵动岛模块:用量监控 / 番茄钟 */
-export type IslandModule = 'usage' | 'pomodoro'
+/** 当前激活的灵动岛模块:用量监控 / 番茄钟 / 剪贴板 */
+export type IslandModule = 'usage' | 'pomodoro' | 'clipboard'
 
 export async function loadActiveModule(): Promise<IslandModule> {
   try {
     const store = await getStore()
     const value = await store.get<IslandModule>(ACTIVE_MODULE_KEY)
-    if (value === 'usage' || value === 'pomodoro') return value
+    if (value === 'usage' || value === 'pomodoro' || value === 'clipboard') return value
   } catch {
     // 读取失败回落用量监控
   }
@@ -254,6 +255,52 @@ export async function loadUsageHistory(): Promise<UsageHistoryPoint[]> {
 export async function saveUsageHistory(points: UsageHistoryPoint[]): Promise<void> {
   const store = await getStore()
   await store.set('usage_history', points)
+  await store.save()
+}
+
+/** 剪贴板记录开关:关闭时监听事件仍到达但前端不落盘(隐私急停) */
+export async function loadClipboardEnabled(): Promise<boolean> {
+  try {
+    const store = await getStore()
+    const value = await store.get<boolean>('clipboard_enabled')
+    if (typeof value === 'boolean') return value
+  } catch {
+    // 读取失败回落默认开
+  }
+  return true
+}
+
+export async function saveClipboardEnabled(enabled: boolean): Promise<void> {
+  const store = await getStore()
+  await store.set('clipboard_enabled', enabled)
+  await store.save()
+}
+
+/** 剪贴板历史读写:结构与淘汰规则见 core/clipboardHistory.ts */
+export async function loadClipboardHistory(): Promise<ClipboardItem[]> {
+  try {
+    const store = await getStore()
+    const value = await store.get<ClipboardItem[]>('clipboard_history')
+    if (Array.isArray(value)) {
+      return value.filter(
+        (item) =>
+          item !== null &&
+          typeof item === 'object' &&
+          typeof item.id === 'string' &&
+          typeof item.text === 'string' &&
+          typeof item.pinned === 'boolean' &&
+          Number.isFinite(item.copiedAt),
+      )
+    }
+  } catch {
+    // 读取失败按无历史处理
+  }
+  return []
+}
+
+export async function saveClipboardHistory(items: ClipboardItem[]): Promise<void> {
+  const store = await getStore()
+  await store.set('clipboard_history', items)
   await store.save()
 }
 

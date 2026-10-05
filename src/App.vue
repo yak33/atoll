@@ -19,6 +19,8 @@ import { QuotaPoller } from './core/QuotaPoller'
 import {
   loadAppearance,
   loadActiveModule,
+  loadClipboardEnabled,
+  loadClipboardHistory,
   loadCredential,
   loadPillPosition,
   loadPomodoro,
@@ -26,6 +28,8 @@ import {
   loadUsageAlerts,
   loadUsageHistory,
   saveActiveModule,
+  saveClipboardEnabled,
+  saveClipboardHistory,
   saveCredential,
   savePillPosition,
   saveUsageHistory,
@@ -42,6 +46,14 @@ import {
   appendHistory,
   type UsageHistoryPoint,
 } from './core/usageHistory'
+import {
+  addClipboardItem,
+  clearUnpinned,
+  removeClipboardItem,
+  togglePin,
+  type ClipboardItem,
+} from './core/clipboardHistory'
+import { invoke } from '@tauri-apps/api/core'
 import { initTheme } from './core/theme'
 import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
@@ -242,6 +254,52 @@ function handleUsageAlerts(next: UsageAlerts): void {
   usageAlerts.value = next
 }
 
+// ===== 剪贴板模块 =====
+// Rust 侧 watcher 事件驱动推文本过来;开关关闭时事件仍到达但不落盘(隐私急停)。
+const clipboardItems = ref<ClipboardItem[]>([])
+const clipboardEnabled = ref(true)
+let unlistenClipboard: (() => void) | null = null
+
+/** 复制历史条目回剪贴板(Rust 命令);失败弹 toast 而非静默——用户有明确意图 */
+async function handleClipboardCopy(text: string): Promise<void> {
+  try {
+    await invoke('write_clipboard_text', { text })
+    void sendToast('已复制到剪贴板')
+  } catch {
+    void sendToast('复制失败,请重试')
+  }
+}
+
+function handleClipboardRemove(id: string): void {
+  clipboardItems.value = removeClipboardItem(clipboardItems.value, id)
+  void saveClipboardHistory(clipboardItems.value)
+}
+
+function handleClipboardPin(id: string): void {
+  clipboardItems.value = togglePin(clipboardItems.value, id)
+  void saveClipboardHistory(clipboardItems.value)
+}
+
+function handleClipboardClear(): void {
+  clipboardItems.value = clearUnpinned(clipboardItems.value)
+  void saveClipboardHistory(clipboardItems.value)
+}
+
+async function handleClipboardEnabled(next: boolean): Promise<void> {
+  clipboardEnabled.value = next
+  try {
+    await saveClipboardEnabled(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
+/** 设置面板「清空全部」:含置顶条目(用户明确操作) */
+function handleClipboardClearAll(): void {
+  clipboardItems.value = []
+  void saveClipboardHistory(clipboardItems.value)
+}
+
 const poller = new QuotaPoller({
   onData: (data) => {
     const messages = detectResetNotifications(lastSnapshot, data, Date.now())
@@ -288,6 +346,8 @@ onMounted(async () => {
   pomo.value = initialPomodoro(pomoCfg.workMin * 60_000, pomoCfg.breakMin * 60_000)
   usageAlerts.value = await loadUsageAlerts()
   history.value = await loadUsageHistory()
+  clipboardItems.value = await loadClipboardHistory()
+  clipboardEnabled.value = await loadClipboardEnabled()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -301,6 +361,13 @@ onMounted(async () => {
   // 托盘「显示/隐藏」:可见性统一由前端管理,与全屏自动隐藏互不打架
   unlistenTray = await listen('tray:toggle-visibility', () => {
     void toggleManualVisibility()
+  })
+
+  // 剪贴板文本变化(Rust watcher 事件驱动);开关关闭时只到内存,不落盘
+  unlistenClipboard = await listen<string>('clipboard:text-changed', (event) => {
+    if (!clipboardEnabled.value) return
+    clipboardItems.value = addClipboardItem(clipboardItems.value, event.payload)
+    void saveClipboardHistory(clipboardItems.value)
   })
   stopFullscreenWatch = startFullscreenWatch({
     isManuallyHidden: () => manualHidden.value,
@@ -347,6 +414,7 @@ onBeforeUnmount(() => {
   cancelBlurClose()
   poller.stop()
   unlistenTray?.()
+  unlistenClipboard?.()
   stopFullscreenWatch?.()
   disposeTheme?.()
   unlistenFocus?.()
@@ -567,6 +635,14 @@ const pillProps = computed<Record<string, unknown>>(() => {
       glowEffects: appearance.value.glowEffects,
     }
   }
+  if (activeModule.value === 'clipboard') {
+    return {
+      latest: clipboardItems.value.slice(0, 3),
+      enabled: clipboardEnabled.value,
+      tooltip: '📋 剪贴板 · 滚轮切换模块',
+      glowEffects: appearance.value.glowEffects,
+    }
+  }
   return {
     win: primary.value,
     text: pillText.value,
@@ -581,6 +657,9 @@ const pillProps = computed<Record<string, unknown>>(() => {
 const panelProps = computed<Record<string, unknown>>(() => {
   if (activeModule.value === 'pomodoro') {
     return { activeModule: activeModule.value, pomo: pomoView.value }
+  }
+  if (activeModule.value === 'clipboard') {
+    return { activeModule: activeModule.value, items: clipboardItems.value, enabled: clipboardEnabled.value }
   }
   return {
     activeModule: activeModule.value,
@@ -601,6 +680,14 @@ const panelProps = computed<Record<string, unknown>>(() => {
 const panelEvents = computed<Record<string, unknown>>(() => {
   if (activeModule.value === 'pomodoro') {
     return { pomoToggle: handlePomoToggle, pomoReset: handlePomoReset }
+  }
+  if (activeModule.value === 'clipboard') {
+    return {
+      copy: handleClipboardCopy,
+      remove: handleClipboardRemove,
+      pin: handleClipboardPin,
+      clear: handleClipboardClear,
+    }
   }
   return { refresh: handleRefresh, settings: openSettings }
 })
@@ -643,6 +730,8 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @appearance="handleAppearance"
     @pomo-durations="handlePomoDurations"
     @usage-alerts="handleUsageAlerts"
+    @clipboard-enabled="handleClipboardEnabled"
+    @clipboard-clear="handleClipboardClearAll"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"
   />

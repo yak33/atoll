@@ -81,6 +81,60 @@ fn set_tray_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), String
     Ok(())
 }
 
+/**
+ * 剪贴板模块(H2):clipboard-rs 的 watcher 走 Win32 AddClipboardFormatListener
+ * 消息,事件驱动零轮询。只把「纯文本」变化推给前端;图像/文件复制时 get_text
+ * 返回 Err,自然被过滤。开关语义在前端(关闭记录时前端忽略事件,不落盘)。
+ */
+mod clipboard_watch {
+    use super::*;
+    // get_text/set_text 在 Clipboard trait 上,add_handler/start_watch 在 ClipboardWatcher trait 上
+    use clipboard_rs::{Clipboard, ClipboardWatcher};
+
+    struct TextHandler {
+        app: tauri::AppHandle,
+        ctx: clipboard_rs::ClipboardContext,
+    }
+
+    impl clipboard_rs::ClipboardHandler for TextHandler {
+        fn on_clipboard_change(&mut self) {
+            // 非文本内容(图像/文件)读文本会 Err,静默跳过
+            if let Ok(text) = self.ctx.get_text() {
+                if !text.is_empty() {
+                    let _ = self.app.emit("clipboard:text-changed", text);
+                }
+            }
+        }
+    }
+
+    /// 启动剪贴板文本监听(幂等:重复调用时第二个 watcher 会因占用失败并静默返回)
+    pub fn start(app: tauri::AppHandle) {
+        std::thread::spawn(move || {
+            let handler = TextHandler {
+                app: app.clone(),
+                ctx: match clipboard_rs::ClipboardContext::new() {
+                    Ok(ctx) => ctx,
+                    Err(_) => return,
+                },
+            };
+            let mut watcher = match clipboard_rs::ClipboardWatcherContext::new() {
+                Ok(watcher) => watcher,
+                Err(_) => return,
+            };
+            watcher.add_handler(handler);
+            watcher.start_watch();
+        });
+    }
+}
+
+/// 把文本写回系统剪贴板(剪贴板历史「点击复制」用)
+#[tauri::command]
+fn write_clipboard_text(text: String) -> Result<(), String> {
+    use clipboard_rs::Clipboard;
+    let ctx = clipboard_rs::ClipboardContext::new().map_err(|e| e.to_string())?;
+    ctx.set_text(text).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -95,8 +149,14 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .invoke_handler(tauri::generate_handler![is_foreground_fullscreen, set_tray_tooltip])
+        .invoke_handler(tauri::generate_handler![
+            is_foreground_fullscreen,
+            set_tray_tooltip,
+            write_clipboard_text
+        ])
         .setup(|app| {
+            // 剪贴板文本监听:应用启动即开始,记录与否由前端设置决定
+            clipboard_watch::start(app.handle().clone());
             // 托盘:显示/隐藏 + 退出。可见性事件发给前端统一管理,
             // 避免 Rust/JS 两边同时改窗口可见性互相打架。
             let toggle = MenuItem::with_id(app, "toggle", "显示 / 隐藏", true, None::<&str>)?;

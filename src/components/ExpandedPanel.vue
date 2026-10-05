@@ -6,8 +6,10 @@
  *
  * @author ZHANGCHAO 2026/10/01
  */
+import { computed } from 'vue'
 import type { QuotaError } from '../types'
-import { formatReset, resetUrgent } from '../composables/nowTick'
+import { formatReset, resetUrgent, nowTick } from '../composables/nowTick'
+import { sparklinePoints, type UsageHistoryPoint } from '../core/usageHistory'
 import ModuleTabs from './ModuleTabs.vue'
 
 const props = defineProps<{
@@ -24,6 +26,8 @@ const props = defineProps<{
   criticalAt: number
   /** 5h 窗口消耗速率预测文案;空串 = 样本不足/不可信,不渲染 */
   burnEstimate: string
+  /** 24h 用量历史,双线趋势图;空数组不渲染 */
+  history: UsageHistoryPoint[]
 }>()
 
 const emit = defineEmits<{
@@ -62,6 +66,12 @@ function onPanelMouseMove(event: MouseEvent): void {
 function onPanelMouseUp(): void {
   armed = false
 }
+
+// 趋势图坐标:x 轴按 60s 应用时钟对齐(与倒计时同源),避免每次渲染都跳
+const TREND_W = 360
+const TREND_H = 44
+const points5h = computed(() => sparklinePoints(props.history, '5h', nowTick.value, TREND_W, TREND_H))
+const points7d = computed(() => sparklinePoints(props.history, '7d', nowTick.value, TREND_W, TREND_H))
 
 function barClass(percent: number): string {
   if (percent >= props.criticalAt) return 'bar-red'
@@ -109,6 +119,18 @@ function urgentOf(iso: string | null): boolean {
       </div>
       <span class="win-percent">{{ Math.round(win.usedPercent) }}%</span>
       <span :class="['win-reset', urgentOf(win.resetAt) ? 'win-reset-urgent' : '']">{{ resetTextOf(win.resetAt) || '-' }}</span>
+    </div>
+
+    <!-- 24h 趋势:5h 强调线 + 7d 弱化线;重置断点保留(物理事实,不人工平滑) -->
+    <div v-if="history.length > 0" class="trend-block" title="近 24 小时用量走势(左端 = 24 小时前)">
+      <div class="trend-head">
+        <span class="trend-label">24h 趋势</span>
+        <span class="trend-legend"><i class="dot dot-5h"></i>5h<i class="dot dot-7d"></i>7d</span>
+      </div>
+      <svg class="trend-svg" :viewBox="`0 0 ${TREND_W} ${TREND_H}`" preserveAspectRatio="none">
+        <polyline class="line-7d" :points="points7d" />
+        <polyline class="line-5h" :points="points5h" />
+      </svg>
     </div>
 
     <div v-if="burnEstimate !== ''" class="burn-line" title="基于最近两次轮询的粗略估算">{{ burnEstimate }}</div>
@@ -247,6 +269,67 @@ function urgentOf(iso: string | null): boolean {
 .win-reset-urgent {
   color: #f59e0b;
   font-weight: 700;
+}
+
+/* 24h 趋势图 */
+.trend-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trend-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trend-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.trend-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: 6px;
+}
+
+.dot-5h {
+  background: var(--accent-color, #4ade80);
+}
+
+.dot-7d {
+  background: var(--text-muted);
+}
+
+.trend-svg {
+  width: 100%;
+  height: 44px;
+  display: block;
+}
+
+.line-5h {
+  fill: none;
+  stroke: var(--accent-color, #4ade80);
+  stroke-width: 1.5;
+}
+
+.line-7d {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  opacity: 0.55;
 }
 
 /* 5h 消耗速率预测行:弱化展示,粗估语义 */

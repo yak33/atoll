@@ -24,9 +24,11 @@ import {
   loadPomodoro,
   loadTheme,
   loadUsageAlerts,
+  loadUsageHistory,
   saveActiveModule,
   saveCredential,
   savePillPosition,
+  saveUsageHistory,
   type AppearanceSettings,
   type IslandModule,
   type PillPosition,
@@ -36,6 +38,10 @@ import {
   DEFAULT_USAGE_ALERTS,
 } from './core/appSettings'
 import { estimateHoursToLimit, formatBurnEstimate, type BurnSample } from './core/burnRate'
+import {
+  appendHistory,
+  type UsageHistoryPoint,
+} from './core/usageHistory'
 import { initTheme } from './core/theme'
 import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
@@ -224,10 +230,11 @@ let stopFullscreenWatch: (() => void) | null = null
 let disposeTheme: (() => void) | null = null
 let unlistenFocus: (() => void) | null = null
 
-// ===== 用量告警阈值 + 消耗速率预测 =====
+// ===== 用量告警阈值 + 消耗速率预测 + 趋势历史 =====
 const usageAlerts = ref<UsageAlerts>({ ...DEFAULT_USAGE_ALERTS })
 let lastBurnSample: BurnSample | null = null
 const burnEstimateText = ref('')
+const history = ref<UsageHistoryPoint[]>([])
 
 function handleUsageAlerts(next: UsageAlerts): void {
   usageAlerts.value = next
@@ -245,6 +252,16 @@ const poller = new QuotaPoller({
         burnEstimateText.value = formatBurnEstimate(estimateHoursToLimit(lastBurnSample, sample))
       }
       lastBurnSample = sample
+    }
+    // 趋势历史:两个窗口各记一条;轮询 5 分钟一次,落盘频率同量级,开销可忽略
+    const window7d = data.windows.find((w) => w.key === 'weekly')
+    if (window5h !== undefined && window7d !== undefined) {
+      history.value = appendHistory(history.value, {
+        at: Date.now(),
+        p5h: window5h.usedPercent,
+        p7d: window7d.usedPercent,
+      })
+      void saveUsageHistory(history.value)
     }
     lastSnapshot = data
     snapshot.value = data
@@ -268,6 +285,7 @@ onMounted(async () => {
   const pomoCfg = await loadPomodoro()
   pomo.value = initialPomodoro(pomoCfg.workMin * 60_000, pomoCfg.breakMin * 60_000)
   usageAlerts.value = await loadUsageAlerts()
+  history.value = await loadUsageHistory()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -548,6 +566,7 @@ const panelProps = computed<Record<string, unknown>>(() => {
     warnAt: usageAlerts.value.warnAt,
     criticalAt: usageAlerts.value.criticalAt,
     burnEstimate: burnEstimateText.value,
+    history: history.value,
   }
 })
 

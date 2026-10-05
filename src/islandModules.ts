@@ -34,8 +34,8 @@ export const ISLAND_MODULES: IslandModuleDefinition[] = [
     label: '用量',
     pill: IslandPill,
     panel: ExpandedPanel,
-    // 宽度至少 400 且跟随药丸,避免展开反而比药丸窄
-    expandedSize: (pillWidth) => new LogicalSize(Math.max(400, pillWidth), 215),
+    // 宽度至少 400 且跟随药丸,避免展开反而比药丸窄;高度含 24h 趋势图
+    expandedSize: (pillWidth) => new LogicalSize(Math.max(400, pillWidth), 265),
   },
   {
     id: 'pomodoro',

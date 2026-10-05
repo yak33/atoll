@@ -7,6 +7,7 @@
  */
 import { load } from '@tauri-apps/plugin-store'
 import type { ZhipuCredential } from '../adapters/zhipu'
+import type { UsageHistoryPoint } from './usageHistory'
 
 const STORE_FILE = 'settings.json'
 const CREDENTIAL_KEY = 'zhipu_credential'
@@ -225,6 +226,34 @@ export async function loadUsageAlerts(): Promise<UsageAlerts> {
 export async function saveUsageAlerts(alerts: UsageAlerts): Promise<void> {
   const store = await getStore()
   await store.set('usage_alerts', normalizeUsageAlerts(alerts.warnAt, alerts.criticalAt))
+  await store.save()
+}
+
+/** 用量历史(trend 折线数据):结构与裁剪规则见 core/usageHistory.ts */
+export async function loadUsageHistory(): Promise<UsageHistoryPoint[]> {
+  try {
+    const store = await getStore()
+    const value = await store.get<UsageHistoryPoint[]>('usage_history')
+    if (Array.isArray(value)) {
+      // 逐条过滤脏数据:字段齐全且时间戳有限才保留
+      return value.filter(
+        (p) =>
+          p !== null &&
+          typeof p === 'object' &&
+          Number.isFinite(p.at) &&
+          Number.isFinite(p.p5h) &&
+          Number.isFinite(p.p7d),
+      )
+    }
+  } catch {
+    // 读取失败按无历史处理
+  }
+  return []
+}
+
+export async function saveUsageHistory(points: UsageHistoryPoint[]): Promise<void> {
+  const store = await getStore()
+  await store.set('usage_history', points)
   await store.save()
 }
 

@@ -8,13 +8,13 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.5-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.8-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-zinc?style=flat-square)](LICENSE)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.5)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.8)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -36,10 +36,12 @@
 ### 1. 智谱 GLM Coding Plan 实时监控
 - **双滚动窗口**：实时上报 5 小时与 7 天两个滚动用量窗口的已用百分比与重置倒计时。
 - **纯本地倒计时**：倒计时由本地应用时钟高精度演算，不产生任何无谓网络请求。
-- **三档感知告警**：
-  - 🟢 **正常态**（< 75%）：翡翠青绿高光游标，药丸保持默认底色；
-  - 🟡 **留意态**（≥ 75%）：胶囊整体转为暖琥珀色，提示适度收着点用；
-  - 🔴 **告警态**（≥ 90%）：红色柔和**内发光呼吸脉冲**（避开窗口硬裁切）；
+- **24 小时趋势折线**：每次轮询自动落盘，展开面板内嵌双线 sparkline 走势图（5h 强调线 / 7d 弱化线），一眼看出消耗速率变化。
+- **消耗速率预测**：基于相邻轮询的斜率粗估「按当前速度预计 X 小时后耗尽」，编码冲刺时心中有数；样本不足或不可信时自动隐藏。
+- **三档感知告警（阈值可配）**：
+  - 🟢 **正常态**：翡翠青绿高光游标，药丸保持默认底色；
+  - 🟡 **留意态**（默认 ≥ 75%，可配）：胶囊整体转为暖琥珀色，提示适度收着点用；
+  - 🔴 **告警态**（默认 ≥ 90%，可配）：红色柔和**内发光呼吸脉冲**（避开窗口硬裁切）；
   - 🔔 **重置提醒**：额度窗口一旦重置，自动发送 Windows Toast 通知。
 - **全场景支持**：适配个人版与团队版（支持配置 `organizationId` 与 `projectId`）；兼容 Token 限额模式与信用额度模式。
 
@@ -59,33 +61,33 @@
   - 鼠标悬停右下角托盘图标即可看实时状态：`atoll · 5h: 24% | 7d: 45%` 或 `atoll · 🍅 专注 22:15`；
   - 托盘右键菜单支持一键显示 / 隐藏与退出。
 - **自由拖拽与记忆**：按住展开面板任意位置即可拖动，窗口位置保存在本地，下次启动原位恢复。
-- **丝滑交互反馈**：收起态鼠标滚轮上下滑动平滑滑屏切屏切换模块；鼠标悬停 200ms 平滑展开完整面板，离开半秒防误触收回。
+- **丝滑交互反馈**：收起态与展开态均可鼠标滚轮上下滑动平滑切屏切换模块；悬停 250ms（hover intent）平滑展开完整面板，轻划掠过不误触，离开半秒防误触收回。
 
 ---
 
 ## 🖥️ 三态形态设计
 
 ```
-[ 收起态 260×44 ] ──( 悬停 / 点击 )──> [ 展开态 340×170 ] ──( 点击设置 )──> [ 设置态 340×480 ]
-  5h [■■■□] 44% 2h15m                      双窗口完整数据 + 刷新按钮               API Key / 时长 / 皮肤
+[ 收起态 260×44 ] ──( 悬停 250ms / 点击设置 )──> [ 展开态 ] ──( 点击设置 )──> [ 设置态 340×700 ]
+  5h [■■■□] 44% 2h15m                           完整数据 + 24h 趋势 + 刷新          按模块分区配置
 ```
 
 | 状态 | 尺寸 (逻辑像素) | 行为与用途 |
 | :--- | :--- | :--- |
 | **收起态 (Pill)** | `260 × 44` (宽度可自定义) | 常驻屏幕顶部，展示当前最紧张窗口或番茄钟状态。鼠标滚轮上下推拉切模块 |
-| **展开态 (Expanded)** | `340 × 170` | 鼠标悬停 200ms 展开两档完整进度条、套餐档位、数据抓取时间及快速刷新 |
-| **设置态 (Settings)** | `340 × 480` | 点击打开设置面板，配置 API Key、番茄钟时长、主题模式、质感皮肤、开机自启 |
+| **展开态 (Expanded)** | 用量 `400+ × 265` / 番茄 `280 × 250` | 悬停 250ms 展开完整进度条、24h 趋势折线、速率预测、套餐档位及快速刷新；滚轮同样可切模块 |
+| **设置态 (Settings)** | `340 × 700` | 点击打开设置面板，按模块分区配置 API Key、告警阈值、番茄时长、主题皮肤、光效、开机自启 |
 
 ---
 
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.5_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.8_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后点击顶部药丸胶囊，在用量设置中粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
-> 🔒 **隐私声明**：atoll 是零后端的纯桌面应用，您的 API Key 仅以加密形式存储在本机本地应用数据目录中，除直连智谱官方额度接口外，绝不向任何第三方服务器上传任何数据。
+> 🔒 **隐私声明**：atoll 是零后端的纯桌面应用，您的 API Key 仅存储在本机应用数据目录（明文 JSON，无加密），除直连智谱官方额度接口外，绝不向任何第三方服务器上传任何数据。
 
 ---
 
@@ -95,15 +97,19 @@
 atoll/
 ├── src/
 │   ├── adapters/        # 数据源适配器: zhipu.ts(官方非公开接口解析与集中容错)
-│   ├── core/            # 核心业务逻辑
+│   ├── core/            # 核心业务逻辑(全部纯函数 + 单测)
 │   │   ├── QuotaPoller.ts       # 轮询调度器: 5分钟轮询 + 随机抖动 + 指数退避
-│   │   ├── pomodoro.ts          # 番茄钟状态机: 纯函数, 基于结束时间戳防漂移
-│   │   ├── appSettings.ts       # 设置持久化: Tauri Store, 包含皮肤预设与外观配置
+│   │   ├── pomodoro.ts          # 番茄钟状态机: 基于结束时间戳防漂移
+│   │   ├── usageHistory.ts      # 24h 用量历史: 采样/裁剪/sparkline 坐标计算
+│   │   ├── burnRate.ts          # 消耗速率预测: 相邻快照斜率粗估
+│   │   ├── appSettings.ts       # 设置持久化: Tauri Store, 含皮肤/阈值/模块等
 │   │   ├── theme.ts             # 主题与 6 款皮肤切换, 系统深浅实时响应
 │   │   ├── tray.ts              # 系统托盘 Tooltip 实时状态同步
 │   │   ├── windowLayout.ts      # 窗口多状态物理尺寸计算与高分屏缩放适配
 │   │   └── fullscreenWatch.ts   # Rust 前台窗口探测驱动的全屏自动隐藏
-│   ├── components/      # UI 组件: 药丸 (Pill) / 展开面板 (Panel) / 设置 (Settings)
+│   ├── composables/     # useGlowEffects(偶发流光触发器) / nowTick(应用时钟)
+│   ├── components/      # 各模块 Pill/Panel 组件对 + ModuleTabs + SettingsPanel
+│   ├── islandModules.ts # 模块注册表: 挂载/滚轮环形切换/尺寸/Tab 全由它驱动
 │   └── App.vue          # 三态状态机、全局 CSS 变量、偶发流光系统与切屏容器
 ├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 开机自启
 └── site/                # Vercel 静态落地页 (HTML/CSS/JS 零构建)
@@ -113,10 +119,10 @@ atoll/
 - **解析隔离**：所有智谱接口的不确定字段由 [adapters/zhipu.ts](src/adapters/zhipu.ts) 单独封装并由单测覆盖，UI 层只接收标准统一数据模型，严禁专有字段渗入组件。
 - **安全鉴权**：遵循智谱官方协议直接发送裸 API Key（不加 `Bearer` 前缀）。
 - **绿色低耗**：
-  - 轮询下限 3 分钟 + 随机抖动，杜绝任何滥刷行为；
+  - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
   - 安装包大小仅 **~2.86 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
-  - **38 个单元测试全部自动化通过**。
+  - **55 个单元测试全部自动化通过**。
 
 ---
 
@@ -155,12 +161,12 @@ npm run tauri build
 
 ## 🧩 如何为 atoll 扩展新模块？
 
-atoll 采用容器化模块设计，增加新功能非常简单（可直接参考番茄钟模块的实现）：
+atoll 采用**注册表驱动的容器化模块设计**（可直接参考番茄钟模块的实现）：
 1. 在 `src/core/` 中编写纯业务逻辑或状态机（纯函数，配套 `.test.ts` 单测）；
 2. 在 `src/components/` 中成对编写收起态药丸 `XxxPill.vue` 与展开面板 `XxxPanel.vue`；
-3. 在 `src/core/appSettings.ts` 中的 `IslandModule` 联合类型追加模块名称；
-4. 在 `src/App.vue` 模板中引入并在收起态与展开态中挂载；
-5. 用户即可通过滚轮滑动或 Tab 点击在各功能模块间无缝切换！
+3. 在 `src/islandModules.ts` 注册表中登记一条：模块 id、显示名、组件对、展开态尺寸；
+4. 在 `src/App.vue` 的 `pillProps` / `panelProps` 接线处为新模块组装 props（唯一的分支点）；
+5. 完成——滚轮环形切换、面板 Tab、尺寸伸缩全部自动生效，容器模板零改动。
 
 ---
 

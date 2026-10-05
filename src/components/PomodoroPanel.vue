@@ -6,6 +6,8 @@
  *
  * @author ZHANGCHAO 2026/10/01
  */
+import ModuleTabs from './ModuleTabs.vue'
+
 defineProps<{
   /** 阶段/剩余文本由 App 按秒算好传入;workMin/breakMin 供提示文案插值 */
   pomo: {
@@ -65,10 +67,7 @@ function onPanelMouseUp(): void {
     @mousemove="onPanelMouseMove"
     @mouseup="onPanelMouseUp"
   >
-    <div class="module-tabs">
-      <button :class="['tab-btn', activeModule === 'usage' ? 'tab-btn-active' : '']" type="button" @click="emit('switchModule', 'usage')">用量</button>
-      <button :class="['tab-btn', activeModule === 'pomodoro' ? 'tab-btn-active' : '']" type="button" @click="emit('switchModule', 'pomodoro')">番茄</button>
-    </div>
+    <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
 
     <div class="pomo-title" title="按住任意位置拖动">🍅 番茄钟</div>
 

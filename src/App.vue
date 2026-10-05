@@ -56,11 +56,8 @@ import {
 import { nowTick } from './composables/nowTick'
 import type { ZhipuCredential } from './adapters/zhipu'
 import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
-import IslandPill from './components/IslandPill.vue'
-import ExpandedPanel from './components/ExpandedPanel.vue'
-import PomodoroPill from './components/PomodoroPill.vue'
-import PomodoroPanel from './components/PomodoroPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import { ISLAND_MODULES } from './islandModules'
 
 /** 药丸高度固定 44px(试过做成可调,收益低且和文字排版耦合),宽度跟随用户自定义 */
 const PILL_HEIGHT = 44
@@ -70,10 +67,9 @@ function pillSize(): LogicalSize {
   return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT)
 }
 
-/** 展开态尺寸按模块:用量面板宽度至少 400 且跟随药丸,番茄面板内容少用固定小尺寸 */
+/** 展开态尺寸来自当前模块的注册表定义 */
 function expandedSize(): LogicalSize {
-  if (activeModule.value === 'pomodoro') return new LogicalSize(280, 250)
-  return new LogicalSize(Math.max(400, appearance.value.pillWidth), 215)
+  return moduleDef.value.expandedSize(appearance.value.pillWidth)
 }
 /** 鼠标离开面板后延迟收回,防止误触抖动(PRD §4.2) */
 const COLLAPSE_DELAY_MS = 500
@@ -93,8 +89,13 @@ let lastSnapshot: ZhipuQuotaSnapshot | null = null
 // 外观自定义:不透明度实时生效,胶囊尺寸在药丸态立即应用
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 
-// ===== 模块层:用量监控 / 番茄钟,收起态滚轮切换,选择持久化 =====
+// ===== 模块层:注册表驱动,收起态滚轮环形切换,选择持久化 =====
 const activeModule = ref<IslandModule>('usage')
+
+/** 当前模块的注册表定义;存储里的非法值兜底到第一个模块 */
+const moduleDef = computed(
+  () => ISLAND_MODULES.find((m) => m.id === activeModule.value) ?? ISLAND_MODULES[0],
+)
 
 async function handleSwitchModule(next: IslandModule): Promise<void> {
   if (next === activeModule.value) return
@@ -104,7 +105,7 @@ async function handleSwitchModule(next: IslandModule): Promise<void> {
   } catch {
     // 持久化失败不影响本次会话生效
   }
-  // 展开态下两个面板尺寸不同,就地伸缩
+  // 展开态下各模块面板尺寸不同,就地伸缩
   if (mode.value === 'expanded') {
     await resizeInPlace(expandedSize())
   }
@@ -115,6 +116,7 @@ let lastWheelSwitch = 0
 // 滚轮切换滑屏方向: 'down' | 'up'
 const wheelDirection = ref<'down' | 'up'>('down')
 
+/** 环形切换:注册表顺序即环形顺序,向下滚取下一个,向上滚取上一个 */
 function handlePillWheel(event?: WheelEvent): void {
   const now = Date.now()
   if (now - lastWheelSwitch < 400) return
@@ -124,7 +126,11 @@ function handlePillWheel(event?: WheelEvent): void {
   } else {
     wheelDirection.value = 'down'
   }
-  void handleSwitchModule(activeModule.value === 'usage' ? 'pomodoro' : 'usage')
+  const len = ISLAND_MODULES.length
+  const idx = ISLAND_MODULES.findIndex((m) => m.id === activeModule.value)
+  if (idx === -1 || len < 2) return
+  const nextIdx = wheelDirection.value === 'down' ? (idx + 1) % len : (idx - 1 + len) % len
+  void handleSwitchModule(ISLAND_MODULES[nextIdx].id)
 }
 
 // ===== 番茄钟 =====
@@ -504,66 +510,71 @@ watchEffect(() => {
     }
   }
 })
+
+// ===== 动态挂载接线:各模块的 props/events 在此集中组装 =====
+// 这是新模块唯一的「接线点」:注册表加一条 + 这里加一个分支,模板与切换逻辑零改动。
+
+const pillProps = computed<Record<string, unknown>>(() => {
+  if (activeModule.value === 'pomodoro') {
+    return {
+      pomo: pomoView.value,
+      tooltip: '🍅 番茄钟 · 滚轮切换模块',
+      glowEffects: appearance.value.glowEffects,
+    }
+  }
+  return {
+    win: primary.value,
+    text: pillText.value,
+    hasError: quotaError.value !== null,
+    tooltip: tooltipText.value,
+    warnAt: usageAlerts.value.warnAt,
+    criticalAt: usageAlerts.value.criticalAt,
+    glowEffects: appearance.value.glowEffects,
+  }
+})
+
+const panelProps = computed<Record<string, unknown>>(() => {
+  if (activeModule.value === 'pomodoro') {
+    return { activeModule: activeModule.value, pomo: pomoView.value }
+  }
+  return {
+    activeModule: activeModule.value,
+    windows: snapshot.value?.windows ?? [],
+    planLevel: snapshot.value?.planLevel ?? '',
+    source: snapshot.value?.source ?? 'tokens_limit',
+    fetchedAgo: fetchedAgoText.value,
+    error: quotaError.value,
+    refreshing: refreshing.value,
+    warnAt: usageAlerts.value.warnAt,
+    criticalAt: usageAlerts.value.criticalAt,
+    burnEstimate: burnEstimateText.value,
+  }
+})
+
+/** 模块特有事件;mouseenter/mouseleave/dragstart/switchModule 四个契约事件静态绑在模板上 */
+const panelEvents = computed<Record<string, unknown>>(() => {
+  if (activeModule.value === 'pomodoro') {
+    return { pomoToggle: handlePomoToggle, pomoReset: handlePomoReset }
+  }
+  return { refresh: handleRefresh, settings: openSettings }
+})
 </script>
 
 <template>
-  <!-- 收起态:按模块渲染药丸;滚轮切换模块(带推拉滑屏微动效),悬停展开,点击设置 -->
+  <!-- 收起态:注册表动态挂载药丸;滚轮环形切换模块(推拉滑屏),悬停展开,点击设置 -->
   <Transition v-if="mode === 'pill'" :name="'pill-slide-' + wheelDirection" mode="out-in">
-    <IslandPill
-      v-if="activeModule === 'usage'"
-      key="usage"
-      :win="primary"
-      :text="pillText"
-      :has-error="quotaError !== null"
-      :tooltip="tooltipText"
-      :warn-at="usageAlerts.warnAt"
-      :critical-at="usageAlerts.criticalAt"
-      :glow-effects="appearance.glowEffects"
-      @click="openSettings"
-      @mouseenter="handlePillHover"
-      @wheel="handlePillWheel"
-    />
-    <PomodoroPill
-      v-else
-      key="pomodoro"
-      :pomo="pomoView"
-      :tooltip="'🍅 番茄钟 · 滚轮切回用量'"
-      :glow-effects="appearance.glowEffects"
-      @click="openSettings"
-      @mouseenter="handlePillHover"
-      @wheel="handlePillWheel"
-    />
+    <component :is="moduleDef.pill" :key="moduleDef.id" v-bind="pillProps" @click="openSettings" @mouseenter="handlePillHover" @wheel="handlePillWheel" />
   </Transition>
 
-  <!-- 展开态:按模块渲染面板,顶部 Tab 切换 -->
-  <ExpandedPanel
-    v-else-if="mode === 'expanded' && activeModule === 'usage'"
-    :windows="snapshot?.windows ?? []"
-    :plan-level="snapshot?.planLevel ?? ''"
-    :source="snapshot?.source ?? 'tokens_limit'"
-    :fetched-ago="fetchedAgoText"
-    :error="quotaError"
-    :refreshing="refreshing"
-    :active-module="activeModule"
-    :warn-at="usageAlerts.warnAt"
-    :critical-at="usageAlerts.criticalAt"
-    :burn-estimate="burnEstimateText"
-    @refresh="handleRefresh"
-    @settings="openSettings"
-    @mouseenter="cancelCollapse"
-    @mouseleave="scheduleCollapse"
-    @dragstart="handleDragStart"
-    @switch-module="handleSwitchModule"
-  />
-  <PomodoroPanel
+  <!-- 展开态:注册表动态挂载面板;Tab 切换,模块特有事件由 panelEvents 组装 -->
+  <component
     v-else-if="mode === 'expanded'"
-    :pomo="pomoView"
-    :active-module="activeModule"
+    :is="moduleDef.panel"
+    v-bind="panelProps"
+    v-on="panelEvents"
     @mouseenter="cancelCollapse"
     @mouseleave="scheduleCollapse"
     @dragstart="handleDragStart"
-    @pomo-toggle="handlePomoToggle"
-    @pomo-reset="handlePomoReset"
     @switch-module="handleSwitchModule"
   />
 

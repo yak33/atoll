@@ -8,6 +8,7 @@
  */
 import type { QuotaError } from '../types'
 import { formatReset, resetUrgent } from '../composables/nowTick'
+import ModuleTabs from './ModuleTabs.vue'
 
 const props = defineProps<{
   windows: { key: '5h' | 'weekly'; usedPercent: number; resetAt: string | null }[]
@@ -92,10 +93,7 @@ function urgentOf(iso: string | null): boolean {
     @mousemove="onPanelMouseMove"
     @mouseup="onPanelMouseUp"
   >
-    <div class="module-tabs">
-      <button :class="['tab-btn', activeModule === 'usage' ? 'tab-btn-active' : '']" type="button" @click="emit('switchModule', 'usage')">用量</button>
-      <button :class="['tab-btn', activeModule === 'pomodoro' ? 'tab-btn-active' : '']" type="button" @click="emit('switchModule', 'pomodoro')">番茄</button>
-    </div>
+    <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
 
     <div class="panel-header" title="按住任意位置拖动">
       <span class="plan">{{ planLevel || '未知套餐' }}</span>

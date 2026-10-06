@@ -22,6 +22,7 @@ import {
   loadClipboardEnabled,
   loadClipboardHistory,
   loadCredential,
+  loadDockFoldEnabled,
   loadPillPosition,
   loadPomodoro,
   loadTheme,
@@ -31,6 +32,7 @@ import {
   saveClipboardEnabled,
   saveClipboardHistory,
   saveCredential,
+  saveDockFoldEnabled,
   savePillPosition,
   saveUsageHistory,
   type AppearanceSettings,
@@ -335,6 +337,19 @@ async function handleClipboardEnabled(next: boolean): Promise<void> {
   }
 }
 
+/** 贴顶折叠开关:关闭立即恢复完整胶囊,后续不再折叠 */
+async function handleDockFoldEnabled(next: boolean): Promise<void> {
+  dockFoldEnabled.value = next
+  try {
+    await saveDockFoldEnabled(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+  if (!next && dockEdge.value !== null) {
+    await undock()
+  }
+}
+
 /** 设置面板「清空全部」:含置顶条目(用户明确操作) */
 function handleClipboardClearAll(): void {
   clipboardItems.value = []
@@ -390,6 +405,7 @@ onMounted(async () => {
   history.value = await loadUsageHistory()
   clipboardItems.value = await loadClipboardHistory()
   clipboardEnabled.value = await loadClipboardEnabled()
+  dockFoldEnabled.value = await loadDockFoldEnabled()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -1064,6 +1080,7 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @pomo-durations="handlePomoDurations"
     @usage-alerts="handleUsageAlerts"
     @clipboard-enabled="handleClipboardEnabled"
+    @dock-fold-enabled="handleDockFoldEnabled"
     @clipboard-clear="handleClipboardClearAll"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"

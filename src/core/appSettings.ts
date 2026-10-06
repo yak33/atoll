@@ -276,6 +276,24 @@ export async function saveClipboardEnabled(enabled: boolean): Promise<void> {
   await store.save()
 }
 
+/** 贴顶自动折叠(F1):默认开;关闭 = 永远保持完整胶囊形态 */
+export async function loadDockFoldEnabled(): Promise<boolean> {
+  try {
+    const store = await getStore()
+    const value = await store.get<boolean>('dock_fold_enabled')
+    if (typeof value === 'boolean') return value
+  } catch {
+    // 读取失败回落默认
+  }
+  return true
+}
+
+export async function saveDockFoldEnabled(value: boolean): Promise<void> {
+  const store = await getStore()
+  await store.set('dock_fold_enabled', value)
+  await store.save()
+}
+
 /** 剪贴板历史读写:结构与淘汰规则见 core/clipboardHistory.ts */
 export async function loadClipboardHistory(): Promise<ClipboardItem[]> {
   try {

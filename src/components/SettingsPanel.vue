@@ -10,6 +10,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   loadAppearance,
+  loadDockFoldEnabled,
   loadClipboardEnabled,
   loadPomodoro,
   loadTheme,
@@ -47,6 +48,7 @@ const emit = defineEmits<{
   usageAlerts: [settings: UsageAlerts]
   clipboardEnabled: [enabled: boolean]
   clipboardClear: []
+  dockFoldEnabled: [enabled: boolean]
   resetPosition: []
   dragstart: []
   close: []
@@ -202,6 +204,8 @@ const alerts = ref<UsageAlerts>({ ...DEFAULT_USAGE_ALERTS })
 
 // 剪贴板记录开关:切换即生效并落盘(隐私急停)
 const clipboardOn = ref(true)
+// 贴顶自动折叠开关(默认开;关闭 = 永远保持完整胶囊)
+const dockFoldOn = ref(true)
 
 function handleClipboardToggle(enabled: boolean): void {
   clipboardOn.value = enabled
@@ -228,6 +232,7 @@ onMounted(async () => {
   pomoCfg.value = await loadPomodoro()
   alerts.value = await loadUsageAlerts()
   clipboardOn.value = await loadClipboardEnabled()
+  dockFoldOn.value = await loadDockFoldEnabled()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -571,6 +576,17 @@ onBeforeUnmount(() => {
       <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
       <span class="field-label">开机自动启动</span>
     </label>
+
+    <label class="toggle-row">
+      <input
+        :checked="dockFoldOn"
+        type="checkbox"
+        class="checkbox"
+        @change="dockFoldOn = ($event.target as HTMLInputElement).checked; emit('dockFoldEnabled', dockFoldOn)"
+      />
+      <span class="field-label">贴顶自动折叠</span>
+    </label>
+    <span class="field-hint">贴顶静止 3 秒后折叠为 3px 霓虹横条,移入即恢复;关闭后永远保持完整胶囊</span>
 
     <!-- 状态反馈:仅在有事发生时出现(自动保存成功/凭据为空阻断),平时不占视觉 -->
     <div v-if="savedAtText !== ''" class="autosave-status">{{ savedAtText }}</div>

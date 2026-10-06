@@ -107,3 +107,28 @@ describe('皮肤主题预设 (SkinTheme)', () => {
     })
   })
 })
+
+describe('clampIntoWorkArea 启动位置安全网', () => {
+  const work = { position: { x: 0, y: 0 }, size: { width: 1920, height: 1080 } }
+
+  it('屏内位置原样保留', async () => {
+    const { clampIntoWorkArea } = await import('../core/windowLayout')
+    const pos = clampIntoWorkArea({ x: 830, y: 6 } as never, 325, 55, work)
+    expect(pos.x).toBe(830)
+    expect(pos.y).toBe(6)
+  })
+
+  it('负坐标拉回左上角', async () => {
+    const { clampIntoWorkArea } = await import('../core/windowLayout')
+    const pos = clampIntoWorkArea({ x: -349, y: 464 } as never, 325, 55, work)
+    expect(pos.x).toBe(0)
+    expect(pos.y).toBe(464)
+  })
+
+  it('超出右/下边拉回边界内', async () => {
+    const { clampIntoWorkArea } = await import('../core/windowLayout')
+    const pos = clampIntoWorkArea({ x: 3000, y: 2000 } as never, 325, 55, work)
+    expect(pos.x).toBe(1920 - 325)
+    expect(pos.y).toBe(1080 - 55)
+  })
+})

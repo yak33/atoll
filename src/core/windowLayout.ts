@@ -52,12 +52,32 @@ export async function resizeInPlace(size: LogicalSize): Promise<PhysicalPosition
   return anchor
 }
 
-/** 初始落位:有保存的锚点用锚点,否则主显示器顶部居中 */
+/** 把窗口位置钳制回工作区内(物理像素):拖动/异常导致的屏外坐标在启动时拉回。
+ *  完整拉回(x/y 均限制在 [边缘, 对边-窗口尺寸])——药丸很小,屏外停留没有意义。 */
+export function clampIntoWorkArea(
+  pos: PhysicalPosition,
+  winWidth: number,
+  winHeight: number,
+  work: { position: { x: number; y: number }; size: { width: number; height: number } },
+): PhysicalPosition {
+  const x = Math.min(Math.max(pos.x, work.position.x), work.position.x + work.size.width - winWidth)
+  const y = Math.min(Math.max(pos.y, work.position.y), work.position.y + work.size.height - winHeight)
+  return new PhysicalPosition(x, y)
+}
+
+/** 初始落位:有保存的锚点用锚点(钳制进工作区,防止拖出屏外后启动即不可见),否则主显示器顶部居中 */
 export async function applyInitialLayout(size: LogicalSize, saved: PhysicalPosition | null): Promise<void> {
   const win = getCurrentWindow()
   await win.setSize(size)
   if (saved !== null) {
-    await win.setPosition(saved)
+    const monitor = await currentMonitor()
+    if (monitor === null) {
+      await win.setPosition(saved)
+      return
+    }
+    const physicalWidth = Math.round(size.width * monitor.scaleFactor)
+    const physicalHeight = Math.round(size.height * monitor.scaleFactor)
+    await win.setPosition(clampIntoWorkArea(saved, physicalWidth, physicalHeight, monitor.workArea))
     return
   }
   const monitor = await currentMonitor()

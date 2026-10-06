@@ -45,20 +45,8 @@ describe('dockedRect', () => {
     expect(r.width).toBe(260)
   })
 
-  it('left/right:缩成 44×44 贴边,纵向位置保留', () => {
-    expect(dockedRect('left', PILL, WORK)).toEqual({ x: 0, y: 6, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE })
-    expect(dockedRect('right', PILL, WORK)).toEqual({
-      x: 1920 - DOCK_MINI_SIZE,
-      y: 6,
-      width: DOCK_MINI_SIZE,
-      height: DOCK_MINI_SIZE,
-    })
-  })
-
-  it('带偏移的多显示器工作区同样正确', () => {
-    const work: Rect = { x: -1920, y: 0, width: 1920, height: 1080 }
-    const r = dockedRect('right', { x: -1700, y: 100, width: 260, height: 44 }, work)
-    expect(r.x).toBe(-44)
-    expect(r.y).toBe(100)
+  it('left/right:就地缩成 44×44,位置完全保留(不跳屏幕边缘)', () => {
+    expect(dockedRect('left', PILL, WORK)).toEqual({ x: 830, y: 6, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE })
+    expect(dockedRect('right', PILL, WORK)).toEqual({ x: 830, y: 6, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE })
   })
 })

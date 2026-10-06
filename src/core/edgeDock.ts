@@ -41,8 +41,9 @@ export function nearestEdge(win: Rect, work: Rect): DockEdge {
 
 /**
  * 折叠态的目标窗口矩形:
- * top/bottom 保持横向位置与宽度,只缩高度并贴边;
- * left/right 保持纵向位置,缩成 44×44 方块贴边。
+ * top/bottom 保持横向位置与宽度,只缩高度并贴边(霓虹线必须贴屏幕边缘);
+ * left/right 就地收缩成 44×44 徽章,位置完全保留——跳到屏幕左/右缘会远离
+ * 用户拖动的位置,产生「消失」感(实测反馈),就地收缩符合最小惊讶原则。
  */
 export function dockedRect(edge: DockEdge, win: Rect, work: Rect): Rect {
   if (edge === 'top') {
@@ -51,8 +52,5 @@ export function dockedRect(edge: DockEdge, win: Rect, work: Rect): Rect {
   if (edge === 'bottom') {
     return { x: win.x, y: work.y + work.height - DOCK_LINE_HEIGHT, width: win.width, height: DOCK_LINE_HEIGHT }
   }
-  if (edge === 'left') {
-    return { x: work.x, y: win.y, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE }
-  }
-  return { x: work.x + work.width - DOCK_MINI_SIZE, y: win.y, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE }
+  return { x: win.x, y: win.y, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE }
 }

@@ -46,20 +46,28 @@ export function nearestEdge(win: Rect, work: Rect): DockEdge {
  * (实测反馈「消失」感),就地收缩符合最小惊讶原则。
  * 所有形态都会钳制进工作区:拖一半出屏时折叠,徽章/线也必须在屏内可见。
  */
-export function dockedRect(edge: DockEdge, win: Rect, work: Rect): Rect {
+export function dockedRect(edge: DockEdge, win: Rect, work: Rect, scaleFactor = 1): Rect {
   const clampX = (x: number, w: number) => Math.min(Math.max(x, work.x), work.x + work.width - w)
   const clampY = (y: number, h: number) => Math.min(Math.max(y, work.y), work.y + work.height - h)
 
+  const lineHeightPhysical = Math.round(DOCK_LINE_HEIGHT * scaleFactor)
+  const miniSizePhysical = Math.round(DOCK_MINI_SIZE * scaleFactor)
+
   if (edge === 'top') {
-    return { x: clampX(win.x, win.width), y: work.y, width: win.width, height: DOCK_LINE_HEIGHT }
+    return { x: clampX(win.x, win.width), y: work.y, width: win.width, height: lineHeightPhysical }
   }
   if (edge === 'bottom') {
     return {
       x: clampX(win.x, win.width),
-      y: work.y + work.height - DOCK_LINE_HEIGHT,
+      y: work.y + work.height - lineHeightPhysical,
       width: win.width,
-      height: DOCK_LINE_HEIGHT,
+      height: lineHeightPhysical,
     }
   }
-  return { x: clampX(win.x, DOCK_MINI_SIZE), y: clampY(win.y, DOCK_MINI_SIZE), width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE }
+  return {
+    x: clampX(win.x, miniSizePhysical),
+    y: clampY(win.y, miniSizePhysical),
+    width: miniSizePhysical,
+    height: miniSizePhysical,
+  }
 }

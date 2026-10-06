@@ -58,4 +58,14 @@ describe('dockedRect', () => {
     // 线形态:x 超出右侧 → 钳回
     expect(dockedRect('top', { ...PILL, x: 1900 }, WORK).x).toBe(1920 - 260)
   })
+
+  it('支持 scaleFactor 缩放换算(如 150% 缩放)', () => {
+    // 150% 缩放下,8px 霓虹线换算为 12px 物理高度,44px 迷你岛换算为 66px 物理边长
+    const top = dockedRect('top', PILL, WORK, 1.5)
+    expect(top.height).toBe(12)
+
+    const left = dockedRect('left', PILL, WORK, 1.5)
+    expect(left.width).toBe(66)
+    expect(left.height).toBe(66)
+  })
 })

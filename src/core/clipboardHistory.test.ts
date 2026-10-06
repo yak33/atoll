@@ -63,6 +63,26 @@ describe('addClipboardItem', () => {
     expect(items.length).toBeLessThanOrEqual(MAX_ITEMS)
     expect(items.some((i) => i.text === 'text-0')).toBe(true)
   })
+
+  it('新复制内容不会挤下已置顶条目;置顶项恒排在最前', () => {
+    let items = seed(2)
+    items = togglePin(items, items[1].id) // text-0 置顶
+    expect(items[0].text).toBe('text-0')
+    expect(items[0].pinned).toBe(true)
+
+    // 新复制一段内容
+    items = addClipboardItem(items, 'new-text', T0 + 9999)
+    // 置顶项仍在第 0 位,新文本排在其后
+    expect(items[0].text).toBe('text-0')
+    expect(items[0].pinned).toBe(true)
+    expect(items[1].text).toBe('new-text')
+    expect(items[1].pinned).toBe(false)
+
+    // 重新复制未置顶条目 text-1
+    items = addClipboardItem(items, 'text-1', T0 + 10000)
+    expect(items[0].text).toBe('text-0')
+    expect(items[1].text).toBe('text-1')
+  })
 })
 
 describe('增删与置顶', () => {

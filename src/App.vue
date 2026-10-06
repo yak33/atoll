@@ -267,6 +267,24 @@ function handleUsageAlerts(next: UsageAlerts): void {
 const clipboardItems = ref<ClipboardItem[]>([])
 const clipboardEnabled = ref(true)
 let unlistenClipboard: (() => void) | null = null
+let clipboardSaveTimer: number | null = null
+
+/** 连续复制 400ms 防抖落盘,避免频繁刷写整个 store */
+function scheduleSaveClipboard(): void {
+  if (clipboardSaveTimer !== null) clearTimeout(clipboardSaveTimer)
+  clipboardSaveTimer = window.setTimeout(() => {
+    clipboardSaveTimer = null
+    void saveClipboardHistory(clipboardItems.value)
+  }, 400)
+}
+
+function flushSaveClipboard(): void {
+  if (clipboardSaveTimer !== null) {
+    clearTimeout(clipboardSaveTimer)
+    clipboardSaveTimer = null
+  }
+  void saveClipboardHistory(clipboardItems.value)
+}
 
 /** 复制历史条目回剪贴板(Rust 命令);失败弹 toast 而非静默——用户有明确意图 */
 async function handleClipboardCopy(text: string): Promise<void> {
@@ -281,17 +299,17 @@ async function handleClipboardCopy(text: string): Promise<void> {
 
 function handleClipboardRemove(id: string): void {
   clipboardItems.value = removeClipboardItem(clipboardItems.value, id)
-  void saveClipboardHistory(clipboardItems.value)
+  flushSaveClipboard()
 }
 
 function handleClipboardPin(id: string): void {
   clipboardItems.value = togglePin(clipboardItems.value, id)
-  void saveClipboardHistory(clipboardItems.value)
+  flushSaveClipboard()
 }
 
 function handleClipboardClear(): void {
   clipboardItems.value = clearUnpinned(clipboardItems.value)
-  void saveClipboardHistory(clipboardItems.value)
+  flushSaveClipboard()
 }
 
 async function handleClipboardEnabled(next: boolean): Promise<void> {
@@ -306,7 +324,7 @@ async function handleClipboardEnabled(next: boolean): Promise<void> {
 /** 设置面板「清空全部」:含置顶条目(用户明确操作) */
 function handleClipboardClearAll(): void {
   clipboardItems.value = []
-  void saveClipboardHistory(clipboardItems.value)
+  flushSaveClipboard()
 }
 
 const poller = new QuotaPoller({
@@ -373,11 +391,11 @@ onMounted(async () => {
     void toggleManualVisibility()
   })
 
-  // 剪贴板文本变化(Rust watcher 事件驱动);开关关闭时只到内存,不落盘
+  // 剪贴板文本变化(Rust watcher 事件驱动);防抖落盘
   unlistenClipboard = await listen<string>('clipboard:text-changed', (event) => {
     if (!clipboardEnabled.value) return
     clipboardItems.value = addClipboardItem(clipboardItems.value, event.payload)
-    void saveClipboardHistory(clipboardItems.value)
+    scheduleSaveClipboard()
   })
 
   // 出屏守卫:2 秒轮询,静止且完全出屏时拉回主屏
@@ -429,6 +447,7 @@ onBeforeUnmount(() => {
   cancelCollapse()
   cancelDock()
   cancelBlurClose()
+  flushSaveClipboard()
   poller.stop()
   unlistenTray?.()
   unlistenClipboard?.()
@@ -549,7 +568,7 @@ async function dockNow(): Promise<void> {
       height: monitor.workArea.size.height,
     }
     const edge = nearestEdge(winRect, workRect)
-    const target = dockedRect(edge, winRect, workRect)
+    const target = dockedRect(edge, winRect, workRect, scaleFactor)
     dockOrigin = {
       pos,
       size: new LogicalSize(Math.round(size.width / scaleFactor), Math.round(size.height / scaleFactor)),
@@ -595,9 +614,11 @@ async function handleDockRestore(): Promise<void> {
 // onMoved 对窗口移动的触发不可靠(实测外部移动不触发),改为 2 秒轮询。
 // 规则:位置静止(不打断拖动中)+ 没被任何一块屏完整装下 → 钳回完整可见
 // (用户拍板:拖多少出屏都自动弹回展示全样);跨两屏驻留是合法可见状态,不打扰。
+// 优化:guardSettled 状态记录,静止无位移时跳过每 2s 的 monitors 系统 IPC。
 let guardTimer = 0
 let lastGuardX = Number.NaN
 let lastGuardY = Number.NaN
+let guardSettled = false
 
 async function guardOffscreen(): Promise<void> {
   // 折叠态位置由 dockedRect 钳制过,不重复处理
@@ -609,8 +630,13 @@ async function guardOffscreen(): Promise<void> {
     if (pos.x !== lastGuardX || pos.y !== lastGuardY) {
       lastGuardX = pos.x
       lastGuardY = pos.y
+      guardSettled = false
       return
     }
+    // 已经静止且已完成出屏检查:无新位移无需重复调用系统 API 查询 monitors
+    if (guardSettled) return
+    guardSettled = true
+
     const [size, monitors] = await Promise.all([win.innerSize(), availableMonitors()])
     const w = Math.round(size.width)
     const h = Math.round(size.height)
@@ -630,7 +656,12 @@ async function guardOffscreen(): Promise<void> {
     // 部分出屏:钳回所在屏;完全出屏:拉回主屏
     const target = hitMonitors[0] ?? (await primaryMonitor())
     if (target === null || target === undefined) return
-    await win.setPosition(clampIntoWorkArea(pos, w, h, target.workArea))
+    const clamped = clampIntoWorkArea(pos, w, h, target.workArea)
+    if (clamped.x !== pos.x || clamped.y !== pos.y) {
+      lastGuardX = clamped.x
+      lastGuardY = clamped.y
+      await win.setPosition(clamped)
+    }
   } catch {
     // 守卫失败静默:不影响任何主流程
   }

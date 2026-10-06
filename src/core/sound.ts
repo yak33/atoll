@@ -21,7 +21,8 @@ function getCtx(): AudioContext | null {
       // 无用户手势时恢复被拒:本次静默跳过
     })
   }
-  return audioCtx.state === 'running' ? audioCtx : null
+  // Web Audio 规范允许向 suspended 状态调度音频节点,resume 异步完成后会自动发声;仅 closed 判空
+  return audioCtx.state !== 'closed' ? audioCtx : null
 }
 
 /** 合成一个短促的双音水滴声:高频轻落 + 低频余韵 */

@@ -9,6 +9,7 @@ import { computed, ref } from 'vue'
 import ModuleTabs from './ModuleTabs.vue'
 import type { IslandModule } from '../core/appSettings'
 import { searchClipboard, summarize, type ClipboardItem } from '../core/clipboardHistory'
+import { nowTick } from '../composables/nowTick'
 
 const props = defineProps<{
   items: ClipboardItem[]
@@ -32,7 +33,7 @@ const keyword = ref('')
 const filtered = computed(() => searchClipboard(props.items, keyword.value))
 
 function timeOf(copiedAt: number): string {
-  const diffMin = Math.floor((Date.now() - copiedAt) / 60_000)
+  const diffMin = Math.floor((nowTick.value - copiedAt) / 60_000)
   if (diffMin < 1) return '刚刚'
   if (diffMin < 60) return `${diffMin} 分钟前`
   const hours = Math.floor(diffMin / 60)
@@ -79,7 +80,10 @@ function onPanelMouseUp(): void {
   >
     <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
 
-    <input v-model="keyword" type="text" class="search" placeholder="搜索剪贴板历史…" />
+    <div class="search-box">
+      <input v-model="keyword" type="text" class="search" placeholder="搜索剪贴板历史…" />
+      <button v-if="keyword !== ''" class="search-clear" type="button" title="清空搜索" @click="keyword = ''">✕</button>
+    </div>
 
     <div class="list">
       <div v-if="filtered.length === 0" class="empty">
@@ -142,11 +146,18 @@ function onPanelMouseUp(): void {
   }
 }
 
+.search-box {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
 .search {
   box-sizing: border-box;
   width: 100%;
   height: 26px;
-  padding: 0 8px;
+  padding: 0 24px 0 8px;
   border-radius: 8px;
   border: 1px solid var(--border-soft);
   background: var(--surface-overlay);
@@ -159,6 +170,28 @@ function onPanelMouseUp(): void {
 
 .search:focus {
   border-color: var(--accent-color, #4ade80);
+}
+
+.search-clear {
+  position: absolute;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.search-clear:hover {
+  color: var(--text-primary);
+  background: var(--border-soft);
 }
 
 .list {

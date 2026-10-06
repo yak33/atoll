@@ -42,20 +42,27 @@ export function addClipboardItem(items: ClipboardItem[], rawText: string, now = 
   if (text === '') return items
 
   const existing = items.find((item) => item.text === text)
+  const pinned = items.filter((item) => item.pinned)
+  const normal = items.filter((item) => !item.pinned)
+
+  let nextPinned = pinned
+  let nextNormal = normal
+
   if (existing !== undefined) {
     const updated: ClipboardItem = { ...existing, copiedAt: now }
-    return [updated, ...items.filter((item) => item.id !== existing.id)]
+    if (existing.pinned) {
+      nextPinned = [updated, ...pinned.filter((item) => item.id !== existing.id)]
+    } else {
+      nextNormal = [updated, ...normal.filter((item) => item.id !== existing.id)]
+    }
+  } else {
+    const next: ClipboardItem = { id: nextId(), text, pinned: false, copiedAt: now }
+    nextNormal = [next, ...normal]
   }
 
-  const next: ClipboardItem = { id: nextId(), text, pinned: false, copiedAt: now }
-  const merged = [next, ...items]
-  if (merged.length <= MAX_ITEMS) return merged
-
-  // 淘汰:保持置顶在前、未置顶按新旧排序,从未置顶末尾删
-  const pinnedItems = merged.filter((item) => item.pinned)
-  const normal = merged.filter((item) => !item.pinned)
-  const keep = MAX_ITEMS - pinnedItems.length
-  return [...pinnedItems.slice(0, Math.max(0, keep)), ...normal.slice(0, Math.max(0, keep))]
+  // 淘汰:置顶项始终在最前且豁免淘汰,从未置顶末尾删
+  const keepNormal = Math.max(0, MAX_ITEMS - nextPinned.length)
+  return [...nextPinned.slice(0, MAX_ITEMS), ...nextNormal.slice(0, keepNormal)]
 }
 
 export function removeClipboardItem(items: ClipboardItem[], id: string): ClipboardItem[] {

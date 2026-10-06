@@ -8,13 +8,13 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.13-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.15-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-zinc?style=flat-square)](LICENSE)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.13)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.15)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -84,7 +84,7 @@
 | 状态 | 尺寸 (逻辑像素) | 行为与用途 |
 | :--- | :--- | :--- |
 | **收起态 (Pill)** | `260 × 44` (宽度可自定义) | 常驻屏幕顶部，展示当前最紧张窗口或番茄钟状态。鼠标滚轮上下推拉切模块 |
-| **展开态 (Expanded)** | 用量 `400+ × 265` / 番茄 `280 × 250` | 悬停 250ms 展开完整进度条、24h 趋势折线、速率预测、套餐档位及快速刷新；滚轮同样可切模块 |
+| **展开态 (Expanded)** | 用量 `400+ × 265` / 番茄 `280 × 250` / 剪贴 `320 × 380` | 悬停 250ms 展开完整进度条、24h 趋势折线、速率预测、剪贴板搜索或番茄控制；滚轮同样可切模块 |
 | **设置态 (Settings)** | `340 × 700` | 点击打开设置面板，按模块分区配置 API Key、告警阈值、番茄时长、主题皮肤、光效、开机自启 |
 
 ---
@@ -92,7 +92,7 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.13_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.15_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后点击顶部药丸胶囊，在用量设置中粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
@@ -116,9 +116,11 @@ atoll/
 │   │   ├── tray.ts              # 系统托盘 Tooltip 实时状态同步
 │   │   ├── windowLayout.ts      # 窗口多状态物理尺寸计算与高分屏缩放适配
 │   │   ├── fullscreenWatch.ts   # Rust 前台窗口探测驱动的全屏自动隐藏
-│   │   └── clipboardHistory.ts  # 剪贴板历史: 去重置顶/上限淘汰/搜索
+│   │   ├── clipboardHistory.ts  # 剪贴板历史: 去重置顶/上限淘汰/搜索
+│   │   ├── edgeDock.ts          # 贴边折叠: 方向判定与物理/高分屏矩形计算
+│   │   └── sound.ts             # 离线微音效: Web Audio 纯前端合成双音水滴声
 │   ├── composables/     # useGlowEffects(偶发流光触发器) / nowTick(应用时钟)
-│   ├── components/      # 各模块 Pill/Panel 组件对 + ModuleTabs + SettingsPanel
+│   ├── components/      # 各模块 Pill/Panel 组件对 + MiniIsland + ModuleTabs + SettingsPanel
 │   ├── islandModules.ts # 模块注册表: 挂载/滚轮环形切换/尺寸/Tab 全由它驱动
 │   └── App.vue          # 三态状态机、全局 CSS 变量、偶发流光系统与切屏容器
 ├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 剪贴板监听 / 开机自启
@@ -132,7 +134,7 @@ atoll/
   - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
   - 安装包大小仅 **~2.89 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
-  - **76 个单元测试全部自动化通过**。
+  - **78 个单元测试全部自动化通过**。
 
 ---
 

@@ -13,7 +13,7 @@
  * @author ZHANGCHAO 2026/09/30
  */
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
-import { getCurrentWindow, currentMonitor, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
+import { getCurrentWindow, currentMonitor, availableMonitors, primaryMonitor, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
 import {
@@ -385,6 +385,11 @@ onMounted(async () => {
     clipboardItems.value = addClipboardItem(clipboardItems.value, event.payload)
     void saveClipboardHistory(clipboardItems.value)
   })
+
+  // 出屏守卫:2 秒轮询,静止且完全出屏时拉回主屏
+  guardTimer = window.setInterval(() => {
+    void guardOffscreen()
+  }, 2000)
   stopFullscreenWatch = startFullscreenWatch({
     isManuallyHidden: () => manualHidden.value,
   })
@@ -433,6 +438,7 @@ onBeforeUnmount(() => {
   poller.stop()
   unlistenTray?.()
   unlistenClipboard?.()
+  window.clearInterval(guardTimer)
   stopFullscreenWatch?.()
   disposeTheme?.()
   unlistenFocus?.()
@@ -589,6 +595,51 @@ async function undock(): Promise<void> {
 async function handleDockRestore(): Promise<void> {
   suppressHoverUntil = Date.now() + 1200
   await undock()
+}
+
+// ===== 窗口出屏守卫(轮询版) =====
+// onMoved 对窗口移动的触发不可靠(实测外部移动不触发),改为 2 秒轮询。
+// 规则:位置静止(不打断拖动中)+ 没被任何一块屏完整装下 → 钳回完整可见
+// (用户拍板:拖多少出屏都自动弹回展示全样);跨两屏驻留是合法可见状态,不打扰。
+let guardTimer = 0
+let lastGuardX = Number.NaN
+let lastGuardY = Number.NaN
+
+async function guardOffscreen(): Promise<void> {
+  // 折叠态位置由 dockedRect 钳制过,不重复处理
+  if (dockEdge.value !== null) return
+  const win = getCurrentWindow()
+  try {
+    const pos = await win.outerPosition()
+    // 位置仍在变化(拖动中):记录后等待下一轮
+    if (pos.x !== lastGuardX || pos.y !== lastGuardY) {
+      lastGuardX = pos.x
+      lastGuardY = pos.y
+      return
+    }
+    const [size, monitors] = await Promise.all([win.innerSize(), availableMonitors()])
+    const w = Math.round(size.width)
+    const h = Math.round(size.height)
+    const intersects = (work: { position: { x: number; y: number }; size: { width: number; height: number } }) =>
+      pos.x < work.position.x + work.size.width &&
+      pos.x + w > work.position.x &&
+      pos.y < work.position.y + work.size.height &&
+      pos.y + h > work.position.y
+    const fullyInside = (work: { position: { x: number; y: number }; size: { width: number; height: number } }) =>
+      pos.x >= work.position.x &&
+      pos.y >= work.position.y &&
+      pos.x + w <= work.position.x + work.size.width &&
+      pos.y + h <= work.position.y + work.size.height
+    const hitMonitors = monitors.filter((m) => intersects(m.workArea))
+    // 完整在某屏内,或横跨两屏(合法驻留):不打扰
+    if (hitMonitors.some((m) => fullyInside(m.workArea)) || hitMonitors.length >= 2) return
+    // 部分出屏:钳回所在屏;完全出屏:拉回主屏
+    const target = hitMonitors[0] ?? (await primaryMonitor())
+    if (target === null || target === undefined) return
+    await win.setPosition(clampIntoWorkArea(pos, w, h, target.workArea))
+  } catch {
+    // 守卫失败静默:不影响任何主流程
+  }
 }
 
 async function handleDockFoldEnabled(next: boolean): Promise<void> {
@@ -857,6 +908,7 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     />
     <component
       :is="moduleDef.pill"
+      v-else
       :key="moduleDef.id"
       v-bind="pillProps"
       @click="openSettings"

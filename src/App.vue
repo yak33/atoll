@@ -59,7 +59,7 @@ import {
 } from './core/clipboardHistory'
 import { invoke } from '@tauri-apps/api/core'
 import { initTheme } from './core/theme'
-import { applyInitialLayout, resizeInPlace } from './core/windowLayout'
+import { applyInitialLayout, resizeInPlace, clampIntoWorkArea } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
 import { updateTrayTooltip } from './core/tray'
@@ -572,8 +572,14 @@ async function undock(): Promise<void> {
   if (origin === null) return
   const win = getCurrentWindow()
   try {
+    // 恢复位置钳进工作区:拖一半出屏后折叠,唤回必须完整可见(否则又是「消失」)
+    const monitor = await currentMonitor()
+    let restore = origin.pos
+    if (monitor !== null) {
+      restore = clampIntoWorkArea(origin.pos, origin.size.width * monitor.scaleFactor, origin.size.height * monitor.scaleFactor, monitor.workArea)
+    }
     await win.setSize(origin.size)
-    await win.setPosition(origin.pos)
+    await win.setPosition(restore)
   } catch {
     // 恢复失败:折叠标记已解除,尺寸异常由下次状态切换修正
   }

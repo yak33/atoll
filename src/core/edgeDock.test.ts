@@ -49,4 +49,13 @@ describe('dockedRect', () => {
     expect(dockedRect('left', PILL, WORK)).toEqual({ x: 830, y: 6, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE })
     expect(dockedRect('right', PILL, WORK)).toEqual({ x: 830, y: 6, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE })
   })
+
+  it('拖一半出屏时,折叠矩形钳制回工作区内(徽章/线必须可见)', () => {
+    // x=-100:徽章左半在屏外 → 钳到 work.x
+    expect(dockedRect('left', { ...PILL, x: -100 }, WORK).x).toBe(0)
+    // y=1060(屏高 1080):44 高的徽章放不下 → 钳到底部边界内
+    expect(dockedRect('left', { ...PILL, y: 1060 }, WORK).y).toBe(1080 - DOCK_MINI_SIZE)
+    // 线形态:x 超出右侧 → 钳回
+    expect(dockedRect('top', { ...PILL, x: 1900 }, WORK).x).toBe(1920 - 260)
+  })
 })

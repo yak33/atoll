@@ -42,15 +42,24 @@ export function nearestEdge(win: Rect, work: Rect): DockEdge {
 /**
  * 折叠态的目标窗口矩形:
  * top/bottom 保持横向位置与宽度,只缩高度并贴边(霓虹线必须贴屏幕边缘);
- * left/right 就地收缩成 44×44 徽章,位置完全保留——跳到屏幕左/右缘会远离
- * 用户拖动的位置,产生「消失」感(实测反馈),就地收缩符合最小惊讶原则。
+ * left/right 就地收缩成 44×44 徽章——跳到屏幕左/右缘会远离用户拖动的位置
+ * (实测反馈「消失」感),就地收缩符合最小惊讶原则。
+ * 所有形态都会钳制进工作区:拖一半出屏时折叠,徽章/线也必须在屏内可见。
  */
 export function dockedRect(edge: DockEdge, win: Rect, work: Rect): Rect {
+  const clampX = (x: number, w: number) => Math.min(Math.max(x, work.x), work.x + work.width - w)
+  const clampY = (y: number, h: number) => Math.min(Math.max(y, work.y), work.y + work.height - h)
+
   if (edge === 'top') {
-    return { x: win.x, y: work.y, width: win.width, height: DOCK_LINE_HEIGHT }
+    return { x: clampX(win.x, win.width), y: work.y, width: win.width, height: DOCK_LINE_HEIGHT }
   }
   if (edge === 'bottom') {
-    return { x: win.x, y: work.y + work.height - DOCK_LINE_HEIGHT, width: win.width, height: DOCK_LINE_HEIGHT }
+    return {
+      x: clampX(win.x, win.width),
+      y: work.y + work.height - DOCK_LINE_HEIGHT,
+      width: win.width,
+      height: DOCK_LINE_HEIGHT,
+    }
   }
-  return { x: win.x, y: win.y, width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE }
+  return { x: clampX(win.x, DOCK_MINI_SIZE), y: clampY(win.y, DOCK_MINI_SIZE), width: DOCK_MINI_SIZE, height: DOCK_MINI_SIZE }
 }

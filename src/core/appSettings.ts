@@ -276,6 +276,42 @@ export async function saveClipboardEnabled(enabled: boolean): Promise<void> {
   await store.save()
 }
 
+/** 通用布尔开关读取(缺省回落 fallback) */
+async function loadBoolFlag(key: string, fallback: boolean): Promise<boolean> {
+  try {
+    const store = await getStore()
+    const value = await store.get<boolean>(key)
+    if (typeof value === 'boolean') return value
+  } catch {
+    // 读取失败回落默认
+  }
+  return fallback
+}
+
+async function saveBoolFlag(key: string, value: boolean): Promise<void> {
+  const store = await getStore()
+  await store.set(key, value)
+  await store.save()
+}
+
+/** 贴边自动微折叠(F1):默认关,激进形态变化由用户主动开启 */
+export function loadDockFoldEnabled(): Promise<boolean> {
+  return loadBoolFlag('dock_fold_enabled', false)
+}
+
+export function saveDockFoldEnabled(value: boolean): Promise<void> {
+  return saveBoolFlag('dock_fold_enabled', value)
+}
+
+/** 离线微音效(F2):默认关 */
+export function loadSoundEnabled(): Promise<boolean> {
+  return loadBoolFlag('sound_enabled', false)
+}
+
+export function saveSoundEnabled(value: boolean): Promise<void> {
+  return saveBoolFlag('sound_enabled', value)
+}
+
 /** 剪贴板历史读写:结构与淘汰规则见 core/clipboardHistory.ts */
 export async function loadClipboardHistory(): Promise<ClipboardItem[]> {
   try {

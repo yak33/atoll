@@ -13,7 +13,7 @@
  * @author ZHANGCHAO 2026/09/30
  */
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
-import { getCurrentWindow, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
+import { getCurrentWindow, currentMonitor, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
 import {
@@ -27,11 +27,15 @@ import {
   loadTheme,
   loadUsageAlerts,
   loadUsageHistory,
+  loadDockFoldEnabled,
+  loadSoundEnabled,
   saveActiveModule,
   saveClipboardEnabled,
   saveClipboardHistory,
   saveCredential,
+  saveDockFoldEnabled,
   savePillPosition,
+  saveSoundEnabled,
   saveUsageHistory,
   type AppearanceSettings,
   type IslandModule,
@@ -72,6 +76,14 @@ import {
   tick as tickPomodoro,
 } from './core/pomodoro'
 import { nowTick } from './composables/nowTick'
+import {
+  dockedRect,
+  nearestEdge,
+  type DockEdge,
+  type Rect,
+} from './core/edgeDock'
+import { playSound } from './core/sound'
+import MiniIsland from './components/MiniIsland.vue'
 import type { ZhipuCredential } from './adapters/zhipu'
 import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
 import SettingsPanel from './components/SettingsPanel.vue'
@@ -265,6 +277,7 @@ async function handleClipboardCopy(text: string): Promise<void> {
   try {
     await invoke('write_clipboard_text', { text })
     void sendToast('已复制到剪贴板')
+    if (soundEnabled.value) playSound('copy')
   } catch {
     void sendToast('复制失败,请重试')
   }
@@ -330,6 +343,7 @@ const poller = new QuotaPoller({
     messages.forEach((message) => {
       void sendToast(message)
     })
+    if (messages.length > 0 && soundEnabled.value) playSound('reset')
   },
   onError: (error) => {
     quotaError.value = error
@@ -348,6 +362,8 @@ onMounted(async () => {
   history.value = await loadUsageHistory()
   clipboardItems.value = await loadClipboardHistory()
   clipboardEnabled.value = await loadClipboardEnabled()
+  dockFoldEnabled.value = await loadDockFoldEnabled()
+  soundEnabled.value = await loadSoundEnabled()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -404,6 +420,7 @@ onMounted(async () => {
       const workMin = Math.round(result.state.workMs / 60_000)
       const breakMin = Math.round(result.state.breakMs / 60_000)
       void sendToast(result.completed === 'work' ? `🍅 专注完成,休息 ${breakMin} 分钟` : `☕ 休息结束,开始专注 ${workMin} 分钟`)
+      if (soundEnabled.value) playSound('phase')
     }
   }, 1000)
 })
@@ -411,6 +428,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   cancelExpand()
   cancelCollapse()
+  cancelDock()
   cancelBlurClose()
   poller.stop()
   unlistenTray?.()
@@ -425,6 +443,11 @@ onBeforeUnmount(() => {
 
 /** 状态切换:就地按目标尺寸伸缩;位置有变化才写盘(悬停收展不刷 store) */
 async function enterMode(target: IslandMode): Promise<void> {
+  // 折叠态先恢复窗口原形态,否则 resizeInPlace 会以折叠矩形为锚点伸缩
+  if (dockEdge.value !== null) {
+    suppressHoverUntil = Date.now() + 1200
+    await undock()
+  }
   mode.value = target
   const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillSize()
   const anchor = await resizeInPlace(size)
@@ -462,11 +485,126 @@ function cancelExpand(): void {
 
 function handlePillHover(): void {
   if (mode.value !== 'pill') return
+  // 刚从折叠态唤回时鼠标就在岛上,这不是浏览意图,短抑制 hover 展开
+  if (Date.now() < suppressHoverUntil) return
+  cancelDock()
   scheduleExpand()
 }
 
 function handlePillLeave(): void {
   cancelExpand()
+  scheduleDock()
+}
+
+// ===== 贴边微折叠(F1) =====
+// 触发:收起态鼠标离开药丸 3 秒;方向跟随最近屏幕边缘;
+// 上下边隐入留 3px 霓虹线,左右边收缩成 44×44 迷你岛(分边策略见 core/edgeDock.ts)。
+// 优先级:托盘手动隐藏 / 全屏隐藏 > 折叠;任何状态切换先解除折叠。
+
+const DOCK_DELAY_MS = 3000
+const dockEdge = ref<DockEdge | null>(null)
+const dockFoldEnabled = ref(false)
+const soundEnabled = ref(false)
+/** 折叠前形态,唤回时恢复 */
+let dockOrigin: { pos: PhysicalPosition; size: LogicalSize } | null = null
+let dockTimer = 0
+/** 折叠唤回后的 hover 展开抑制截止时刻 */
+let suppressHoverUntil = 0
+
+function cancelDock(): void {
+  if (dockTimer !== 0) {
+    window.clearTimeout(dockTimer)
+    dockTimer = 0
+  }
+}
+
+function scheduleDock(): void {
+  cancelDock()
+  // 折叠只在:开关开 + 收起态 + 未折叠 + 未被手动隐藏
+  if (!dockFoldEnabled.value || mode.value !== 'pill' || dockEdge.value !== null || manualHidden.value) return
+  dockTimer = window.setTimeout(() => {
+    dockTimer = 0
+    void dockNow()
+  }, DOCK_DELAY_MS)
+}
+
+async function dockNow(): Promise<void> {
+  if (mode.value !== 'pill' || dockEdge.value !== null) return
+  const win = getCurrentWindow()
+  try {
+    const [pos, size, monitor] = await Promise.all([win.outerPosition(), win.innerSize(), currentMonitor()])
+    if (monitor === null) return
+    const scaleFactor = monitor.scaleFactor
+    // 均为物理像素:窗口矩形与工作区矩形同单位参与判定
+    const winRect: Rect = {
+      x: pos.x,
+      y: pos.y,
+      width: Math.round(size.width),
+      height: Math.round(size.height),
+    }
+    const workRect: Rect = {
+      x: monitor.workArea.position.x,
+      y: monitor.workArea.position.y,
+      width: monitor.workArea.size.width,
+      height: monitor.workArea.size.height,
+    }
+    const edge = nearestEdge(winRect, workRect)
+    const target = dockedRect(edge, winRect, workRect)
+    dockOrigin = {
+      pos,
+      size: new LogicalSize(Math.round(size.width / scaleFactor), Math.round(size.height / scaleFactor)),
+    }
+    dockEdge.value = edge
+    await win.setSize(new LogicalSize(Math.round(target.width / scaleFactor), Math.round(target.height / scaleFactor)))
+    await win.setPosition(new PhysicalPosition(target.x, target.y))
+  } catch {
+    // 窗口操作失败不影响主流程,折叠放弃
+    dockEdge.value = null
+    dockOrigin = null
+  }
+}
+
+async function undock(): Promise<void> {
+  if (dockEdge.value === null) return
+  dockEdge.value = null
+  const origin = dockOrigin
+  dockOrigin = null
+  if (origin === null) return
+  const win = getCurrentWindow()
+  try {
+    await win.setSize(origin.size)
+    await win.setPosition(origin.pos)
+  } catch {
+    // 恢复失败:折叠标记已解除,尺寸异常由下次状态切换修正
+  }
+}
+
+/** 折叠态迷你岛的唤回手势 */
+async function handleDockRestore(): Promise<void> {
+  suppressHoverUntil = Date.now() + 1200
+  await undock()
+}
+
+async function handleDockFoldEnabled(next: boolean): Promise<void> {
+  dockFoldEnabled.value = next
+  try {
+    await saveDockFoldEnabled(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+  // 使用中关闭开关:立即恢复完整药丸
+  if (!next && dockEdge.value !== null) {
+    await undock()
+  }
+}
+
+async function handleSoundEnabled(next: boolean): Promise<void> {
+  soundEnabled.value = next
+  try {
+    await saveSoundEnabled(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
 }
 
 function scheduleCollapse(): void {
@@ -624,6 +762,13 @@ watchEffect(() => {
   }
 })
 
+/** 折叠态迷你方块的徽章内容:按模块显示最简状态(线形态不显示) */
+const dockBadge = computed(() => {
+  if (activeModule.value === 'pomodoro') return pomoClockText.value
+  if (activeModule.value === 'clipboard') return '📋'
+  return primary.value !== null ? `${Math.round(primary.value.usedPercent)}%` : '--'
+})
+
 // ===== 动态挂载接线:各模块的 props/events 在此集中组装 =====
 // 这是新模块唯一的「接线点」:注册表加一条 + 这里加一个分支,模板与切换逻辑零改动。
 
@@ -694,8 +839,16 @@ const panelEvents = computed<Record<string, unknown>>(() => {
 </script>
 
 <template>
-  <!-- 收起态:注册表动态挂载药丸;滚轮环形切换模块(推拉滑屏),悬停展开,点击设置 -->
+  <!-- 收起态:优先渲染贴边折叠态的迷你岛;否则注册表动态挂载药丸 -->
   <Transition v-if="mode === 'pill'" :name="'pill-slide-' + wheelDirection" mode="out-in">
+    <MiniIsland
+      v-if="dockEdge !== null"
+      key="docked"
+      :edge="dockEdge"
+      :badge="dockBadge"
+      @mouseenter="handleDockRestore"
+      @click="openSettings"
+    />
     <component
       :is="moduleDef.pill"
       :key="moduleDef.id"
@@ -732,6 +885,8 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @usage-alerts="handleUsageAlerts"
     @clipboard-enabled="handleClipboardEnabled"
     @clipboard-clear="handleClipboardClearAll"
+    @dock-fold-enabled="handleDockFoldEnabled"
+    @sound-enabled="handleSoundEnabled"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"
   />

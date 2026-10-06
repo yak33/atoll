@@ -27,15 +27,11 @@ import {
   loadTheme,
   loadUsageAlerts,
   loadUsageHistory,
-  loadDockFoldEnabled,
-  loadSoundEnabled,
   saveActiveModule,
   saveClipboardEnabled,
   saveClipboardHistory,
   saveCredential,
-  saveDockFoldEnabled,
   savePillPosition,
-  saveSoundEnabled,
   saveUsageHistory,
   type AppearanceSettings,
   type IslandModule,
@@ -362,8 +358,6 @@ onMounted(async () => {
   history.value = await loadUsageHistory()
   clipboardItems.value = await loadClipboardHistory()
   clipboardEnabled.value = await loadClipboardEnabled()
-  dockFoldEnabled.value = await loadDockFoldEnabled()
-  soundEnabled.value = await loadSoundEnabled()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -509,8 +503,8 @@ function handlePillLeave(): void {
 
 const DOCK_DELAY_MS = 3000
 const dockEdge = ref<DockEdge | null>(null)
-const dockFoldEnabled = ref(false)
-const soundEnabled = ref(false)
+const dockFoldEnabled = ref(true)
+const soundEnabled = ref(true)
 /** 折叠前形态,唤回时恢复 */
 let dockOrigin: { pos: PhysicalPosition; size: LogicalSize } | null = null
 let dockTimer = 0
@@ -639,28 +633,6 @@ async function guardOffscreen(): Promise<void> {
     await win.setPosition(clampIntoWorkArea(pos, w, h, target.workArea))
   } catch {
     // 守卫失败静默:不影响任何主流程
-  }
-}
-
-async function handleDockFoldEnabled(next: boolean): Promise<void> {
-  dockFoldEnabled.value = next
-  try {
-    await saveDockFoldEnabled(next)
-  } catch {
-    // 持久化失败不影响本次会话生效
-  }
-  // 使用中关闭开关:立即恢复完整药丸
-  if (!next && dockEdge.value !== null) {
-    await undock()
-  }
-}
-
-async function handleSoundEnabled(next: boolean): Promise<void> {
-  soundEnabled.value = next
-  try {
-    await saveSoundEnabled(next)
-  } catch {
-    // 持久化失败不影响本次会话生效
   }
 }
 
@@ -943,8 +915,6 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @usage-alerts="handleUsageAlerts"
     @clipboard-enabled="handleClipboardEnabled"
     @clipboard-clear="handleClipboardClearAll"
-    @dock-fold-enabled="handleDockFoldEnabled"
-    @sound-enabled="handleSoundEnabled"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"
   />

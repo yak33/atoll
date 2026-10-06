@@ -440,6 +440,9 @@ onMounted(async () => {
       if (soundEnabled.value) playSound('phase')
     }
   }, 1000)
+
+  // 初始启动后安排贴边折叠倒计时
+  scheduleDock()
 })
 
 onBeforeUnmount(() => {
@@ -479,6 +482,10 @@ async function enterMode(target: IslandMode): Promise<void> {
     } catch {
       // 持久化失败仅影响下次启动落位
     }
+  }
+  // 切换回收起态药丸时,安排贴边折叠倒计时
+  if (target === 'pill') {
+    scheduleDock()
   }
 }
 
@@ -551,7 +558,8 @@ async function dockNow(): Promise<void> {
   if (mode.value !== 'pill' || dockEdge.value !== null) return
   const win = getCurrentWindow()
   try {
-    const [pos, size, monitor] = await Promise.all([win.outerPosition(), win.innerSize(), currentMonitor()])
+    const [pos, size, curMon] = await Promise.all([win.outerPosition(), win.innerSize(), currentMonitor()])
+    const monitor = curMon ?? (await primaryMonitor())
     if (monitor === null) return
     const scaleFactor = monitor.scaleFactor
     // 均为物理像素:窗口矩形与工作区矩形同单位参与判定
@@ -576,8 +584,8 @@ async function dockNow(): Promise<void> {
     dockEdge.value = edge
     await win.setSize(new LogicalSize(Math.round(target.width / scaleFactor), Math.round(target.height / scaleFactor)))
     await win.setPosition(new PhysicalPosition(target.x, target.y))
-  } catch {
-    // 窗口操作失败不影响主流程,折叠放弃
+  } catch (err) {
+    console.error('[atoll] dockNow failed:', err)
     dockEdge.value = null
     dockOrigin = null
   }
@@ -608,6 +616,7 @@ async function undock(): Promise<void> {
 async function handleDockRestore(): Promise<void> {
   suppressHoverUntil = Date.now() + 1200
   await undock()
+  scheduleDock()
 }
 
 // ===== 窗口出屏守卫(轮询版) =====

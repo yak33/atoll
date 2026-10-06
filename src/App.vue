@@ -167,6 +167,21 @@ function handlePillWheel(event?: WheelEvent): void {
   void handleSwitchModule(ISLAND_MODULES[nextIdx].id)
 }
 
+/**
+ * 展开态下的滚轮处理:
+ * 若事件源处于可滚动内容容器(如剪贴板列表 .list、完整预览 .preview-body 等),放行原生滚动,不切模块;
+ * 仅当事件源在非滚动区域(如顶部 ModuleTabs、空白区域)时,才响应滚轮切模块。
+ */
+function handleExpandedWheel(event: WheelEvent): void {
+  const target = event.target as HTMLElement | null
+  const scrollable = target?.closest('.list, .preview-body, .preview-card, [data-scrollable]') as HTMLElement | null
+  if (scrollable !== null) {
+    return
+  }
+  event.preventDefault()
+  handlePillWheel(event)
+}
+
 // ===== 番茄钟 =====
 // 计时基于结束时间戳(见 core/pomodoro.ts 头注释):1s interval 只做显示刷新,
 // 窗口被隐藏导致节流也不影响剩余时间与阶段切换的正确性。
@@ -846,6 +861,11 @@ async function guardOffscreen(): Promise<void> {
 
 function scheduleCollapse(): void {
   cancelCollapse()
+  // 输入保护:若当前焦点位于输入框(如剪贴板搜索/中文输入法打字),禁止收回
+  const activeEl = document.activeElement
+  if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) {
+    return
+  }
   collapseTimer = window.setTimeout(() => {
     void enterMode('pill')
   }, COLLAPSE_DELAY_MS)
@@ -1107,7 +1127,7 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @mouseleave="scheduleCollapse"
     @dragstart="handleDragStart"
     @switch-module="handleSwitchModule"
-    @wheel.prevent="handlePillWheel"
+    @wheel="handleExpandedWheel"
   />
 
   <!-- 设置态:数据查看与手动刷新都在悬停展开面板里,这里只管设置 -->

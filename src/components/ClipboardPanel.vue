@@ -31,6 +31,59 @@ const emit = defineEmits<{
 
 const keyword = ref('')
 const filtered = computed(() => searchClipboard(props.items, keyword.value))
+const searchInputRef = ref<HTMLInputElement | null>(null)
+const isInputFocused = ref(false)
+const isComposing = ref(false)
+const isMouseOverPanel = ref(false)
+
+function onPanelMouseEnter(): void {
+  isMouseOverPanel.value = true
+  emit('mouseenter')
+}
+
+function onPanelMouseLeave(): void {
+  isMouseOverPanel.value = false
+  // 输入聚焦保护:若输入框处于聚焦打字或中文拼音候选状态,拦截外部收回
+  if (isInputFocused.value || isComposing.value) {
+    return
+  }
+  emit('mouseleave')
+}
+
+function onInputFocus(): void {
+  isInputFocused.value = true
+  emit('mouseenter')
+}
+
+function onInputBlur(): void {
+  // 延迟检查:抹平中文输入法候选浮窗选词瞬间的瞬态失焦抖动
+  window.setTimeout(() => {
+    if (document.activeElement === searchInputRef.value || isComposing.value) {
+      return
+    }
+    isInputFocused.value = false
+    // 若失焦时鼠标已经离开面板,触发延时收回
+    if (!isMouseOverPanel.value) {
+      emit('mouseleave')
+    }
+  }, 220)
+}
+
+function onCompositionStart(): void {
+  isComposing.value = true
+}
+
+function onCompositionEnd(): void {
+  isComposing.value = false
+}
+
+function onInputEsc(event: KeyboardEvent): void {
+  if (keyword.value !== '') {
+    keyword.value = ''
+  } else {
+    ;(event.target as HTMLInputElement)?.blur()
+  }
+}
 
 // ===== 悬停长文本 / 图片毛玻璃预览卡片 (方案 B) =====
 const previewItem = ref<ClipboardItem | null>(null)
@@ -107,8 +160,8 @@ function onPanelMouseUp(): void {
 <template>
   <div
     class="panel"
-    @mouseenter="emit('mouseenter')"
-    @mouseleave="emit('mouseleave')"
+    @mouseenter="onPanelMouseEnter"
+    @mouseleave="onPanelMouseLeave"
     @mousedown="onPanelMouseDown"
     @mousemove="onPanelMouseMove"
     @mouseup="onPanelMouseUp"
@@ -116,11 +169,22 @@ function onPanelMouseUp(): void {
     <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
 
     <div class="search-box">
-      <input v-model="keyword" type="text" class="search" placeholder="搜索剪贴板历史…" />
+      <input
+        ref="searchInputRef"
+        v-model="keyword"
+        type="text"
+        class="search"
+        placeholder="搜索剪贴板历史…"
+        @focus="onInputFocus"
+        @blur="onInputBlur"
+        @compositionstart="onCompositionStart"
+        @compositionend="onCompositionEnd"
+        @keydown.esc="onInputEsc"
+      />
       <button v-if="keyword !== ''" class="search-clear" type="button" title="清空搜索" @click="keyword = ''">✕</button>
     </div>
 
-    <div class="list">
+    <div class="list" @wheel.stop>
       <div v-if="filtered.length === 0" class="empty">
         {{ items.length === 0 ? (enabled ? '复制点文本或截图,这里就会出现' : '记录已关闭,可在设置中开启') : '没有匹配的条目' }}
       </div>
@@ -160,6 +224,7 @@ function onPanelMouseUp(): void {
         :title="previewItem.kind === 'image' ? '点击复制图片' : '点击复制完整文本'"
         @mouseenter="onCardMouseEnter"
         @mouseleave="onCardMouseLeave"
+        @wheel.stop
         @click.stop="emit('copy', previewItem)"
       >
         <div class="preview-header">

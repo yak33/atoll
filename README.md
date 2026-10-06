@@ -8,13 +8,13 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.19-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.20-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-zinc?style=flat-square)](LICENSE)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.19)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.20)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -67,7 +67,7 @@
 - **窗口永不丢失**：拖出屏幕多少都自动弹回完整可见（松手/鼠标离开即触发）；位置记忆带启动安全网。
 - **系统托盘实时监控**：
   - 鼠标悬停右下角托盘图标即可看实时状态：`atoll · 5h: 24% | 7d: 45%` 或 `atoll · 🍅 专注 22:15`；
-  - 托盘右键菜单支持一键显示 / 隐藏与退出。
+  - 托盘右键菜单:显示/隐藏、隐藏托盘图标(设置中可恢复)、关于(版本/作者/链接)、退出。
 - **自由拖拽与记忆**：收起态药丸与展开面板均可直接按住拖动，窗口位置保存在本地，下次启动原位恢复。
 - **丝滑交互反馈**：收起态与展开态均可鼠标滚轮上下滑动平滑切屏切换模块；悬停 250ms（hover intent）平滑展开完整面板，轻划掠过不误触，离开半秒防误触收回。
 - **状态音效**：番茄阶段切换、额度窗口重置、复制成功时轻响一声，Web Audio 合成零音频文件。
@@ -92,7 +92,7 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.19_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.20_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后点击顶部药丸胶囊，在用量设置中粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 

@@ -135,6 +135,39 @@ fn write_clipboard_text(text: String) -> Result<(), String> {
     ctx.set_text(text).map_err(|e| e.to_string())
 }
 
+/// 显示/隐藏托盘图标(设置面板「显示托盘图标」开关用)
+#[tauri::command]
+fn set_tray_visible(app: tauri::AppHandle, visible: bool) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        if visible {
+            tray.set_visible(true).map_err(|e| e.to_string())?;
+        } else {
+            tray.set_visible(false).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+/// 退出应用(托盘被隐藏后,设置面板的兜底退出入口)
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0)
+}
+
+/// 「关于」弹窗:版本 + 作者 + 链接,Windows 原生 MessageBox
+fn show_about_dialog(app: &tauri::AppHandle) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONINFORMATION, MB_OK};
+    let version = app.package_info().version.to_string();
+    let text = format!(
+        "atoll(环礁)v{version}\nWindows 桌面灵动岛悬浮组件\n\n作者:ZHANGCHAO\n官网:https://atoll-site-swart.vercel.app\n源码:https://github.com/yak33/atoll"
+    );
+    let title: Vec<u16> = "atoll · 关于".encode_utf16().chain(std::iter::once(0)).collect();
+    let text_wide: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), text_wide.as_ptr(), title.as_ptr(), MB_OK | MB_ICONINFORMATION);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -152,16 +185,20 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             is_foreground_fullscreen,
             set_tray_tooltip,
-            write_clipboard_text
+            write_clipboard_text,
+            set_tray_visible,
+            quit_app
         ])
         .setup(|app| {
             // 剪贴板文本监听:应用启动即开始,记录与否由前端设置决定
             clipboard_watch::start(app.handle().clone());
-            // 托盘:显示/隐藏 + 退出。可见性事件发给前端统一管理,
+            // 托盘:显示/隐藏 + 隐藏托盘 + 关于 + 退出。窗口可见性事件发给前端统一管理,
             // 避免 Rust/JS 两边同时改窗口可见性互相打架。
             let toggle = MenuItem::with_id(app, "toggle", "显示 / 隐藏", true, None::<&str>)?;
+            let hide_tray = MenuItem::with_id(app, "hide-tray", "隐藏托盘图标", true, None::<&str>)?;
+            let about = MenuItem::with_id(app, "about", "关于 atoll", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle, &quit])?;
+            let menu = Menu::with_items(app, &[&toggle, &hide_tray, &about, &quit])?;
 
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().expect("未配置窗口图标").clone())
@@ -174,6 +211,16 @@ pub fn run() {
                             let _ = window.emit("tray:toggle-visibility", ());
                         }
                     }
+                    "hide-tray" => {
+                        if let Some(tray) = app.tray_by_id("main") {
+                            let _ = tray.set_visible(false);
+                        }
+                        // 通知前端同步设置面板的开关状态并持久化
+                        if let Some(window) = app.get_webview_window("island") {
+                            let _ = window.emit("tray:hidden", ());
+                        }
+                    }
+                    "about" => show_about_dialog(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })

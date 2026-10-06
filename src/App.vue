@@ -23,6 +23,7 @@ import {
   loadClipboardHistory,
   loadCredential,
   loadDockFoldEnabled,
+  loadTrayVisible,
   loadPillPosition,
   loadPomodoro,
   loadTheme,
@@ -33,6 +34,7 @@ import {
   saveClipboardHistory,
   saveCredential,
   saveDockFoldEnabled,
+  saveTrayVisible,
   savePillPosition,
   saveUsageHistory,
   type AppearanceSettings,
@@ -60,7 +62,7 @@ import { initTheme } from './core/theme'
 import { applyInitialLayout, resizeInPlace, clampIntoWorkArea } from './core/windowLayout'
 import { detectResetNotifications } from './core/resetNotify'
 import { sendToast } from './core/notify'
-import { updateTrayTooltip } from './core/tray'
+import { updateTrayTooltip, setTrayVisible, quitApp } from './core/tray'
 import { startFullscreenWatch } from './core/fullscreenWatch'
 import {
   applyDurations,
@@ -264,6 +266,7 @@ let collapseTimer: number | null = null
 // 托盘手动隐藏标志:全屏自动恢复不越过用户意愿
 const manualHidden = ref(false)
 let unlistenTray: (() => void) | null = null
+let unlistenTrayHidden: (() => void) | null = null
 let stopFullscreenWatch: (() => void) | null = null
 let disposeTheme: (() => void) | null = null
 let unlistenFocus: (() => void) | null = null
@@ -350,6 +353,16 @@ async function handleDockFoldEnabled(next: boolean): Promise<void> {
   }
 }
 
+/** 托盘图标显示开关:设置面板入口(托盘菜单「隐藏托盘图标」的事件也会走到这里同步落盘) */
+async function handleTrayVisible(next: boolean): Promise<void> {
+  await setTrayVisible(next)
+  try {
+    await saveTrayVisible(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
 /** 设置面板「清空全部」:含置顶条目(用户明确操作) */
 function handleClipboardClearAll(): void {
   clipboardItems.value = []
@@ -396,6 +409,10 @@ const poller = new QuotaPoller({
 onMounted(async () => {
   // 主题与外观先行:避免首帧配色/尺寸跳变(index.html 默认 data-theme="dark")
   disposeTheme = initTheme(await loadTheme())
+  const trayVisibleLoaded = await loadTrayVisible()
+  if (!trayVisibleLoaded) {
+    await handleTrayVisible(false)
+  }
   appearance.value = await loadAppearance()
   activeModule.value = await loadActiveModule()
   // 番茄钟时长从持久化配置初始化
@@ -419,6 +436,11 @@ onMounted(async () => {
   // 托盘「显示/隐藏」:可见性统一由前端管理,与全屏自动隐藏互不打架
   unlistenTray = await listen('tray:toggle-visibility', () => {
     void toggleManualVisibility()
+  })
+
+  // 托盘菜单「隐藏托盘图标」:同步设置面板状态并落盘
+  unlistenTrayHidden = await listen('tray:hidden', () => {
+    void saveTrayVisible(false)
   })
 
   // 剪贴板文本变化(Rust watcher 事件驱动);防抖落盘
@@ -483,6 +505,7 @@ onBeforeUnmount(() => {
   flushSaveClipboard()
   poller.stop()
   unlistenTray?.()
+  unlistenTrayHidden?.()
   unlistenClipboard?.()
   window.clearInterval(guardTimer)
   stopFullscreenWatch?.()
@@ -1082,6 +1105,8 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @usage-alerts="handleUsageAlerts"
     @clipboard-enabled="handleClipboardEnabled"
     @dock-fold-enabled="handleDockFoldEnabled"
+    @tray-visible="handleTrayVisible"
+    @quit="quitApp"
     @clipboard-clear="handleClipboardClearAll"
     @reset-position="handleResetPosition"
     @dragstart="handleDragStart"

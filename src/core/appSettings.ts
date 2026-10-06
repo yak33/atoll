@@ -294,6 +294,24 @@ export async function saveDockFoldEnabled(value: boolean): Promise<void> {
   await store.save()
 }
 
+/** 托盘图标显示:默认显示;隐藏后入口在设置面板,退出兜底也在设置面板 */
+export async function loadTrayVisible(): Promise<boolean> {
+  try {
+    const store = await getStore()
+    const value = await store.get<boolean>('tray_visible')
+    if (typeof value === 'boolean') return value
+  } catch {
+    // 读取失败回落默认
+  }
+  return true
+}
+
+export async function saveTrayVisible(value: boolean): Promise<void> {
+  const store = await getStore()
+  await store.set('tray_visible', value)
+  await store.save()
+}
+
 /** 剪贴板历史读写:结构与淘汰规则见 core/clipboardHistory.ts */
 export async function loadClipboardHistory(): Promise<ClipboardItem[]> {
   try {

@@ -11,6 +11,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   loadAppearance,
   loadDockFoldEnabled,
+  loadTrayVisible,
   loadClipboardEnabled,
   loadPomodoro,
   loadTheme,
@@ -49,6 +50,8 @@ const emit = defineEmits<{
   clipboardEnabled: [enabled: boolean]
   clipboardClear: []
   dockFoldEnabled: [enabled: boolean]
+  trayVisible: [visible: boolean]
+  quit: []
   resetPosition: []
   dragstart: []
   close: []
@@ -204,6 +207,8 @@ const alerts = ref<UsageAlerts>({ ...DEFAULT_USAGE_ALERTS })
 
 // 剪贴板记录开关:切换即生效并落盘(隐私急停)
 const clipboardOn = ref(true)
+// 托盘图标显示开关(默认显示;托盘菜单「隐藏托盘图标」也会写入该状态)
+const trayVisibleOn = ref(true)
 // 贴顶自动折叠开关(默认开;关闭 = 永远保持完整胶囊)
 const dockFoldOn = ref(true)
 
@@ -233,6 +238,7 @@ onMounted(async () => {
   alerts.value = await loadUsageAlerts()
   clipboardOn.value = await loadClipboardEnabled()
   dockFoldOn.value = await loadDockFoldEnabled()
+  trayVisibleOn.value = await loadTrayVisible()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -587,6 +593,19 @@ onBeforeUnmount(() => {
       <span class="field-label">贴顶自动折叠</span>
     </label>
     <span class="field-hint">贴顶静止 3 秒后折叠为 3px 霓虹横条,移入即恢复;关闭后永远保持完整胶囊</span>
+
+    <label class="toggle-row">
+      <input
+        :checked="trayVisibleOn"
+        type="checkbox"
+        class="checkbox"
+        @change="trayVisibleOn = ($event.target as HTMLInputElement).checked; emit('trayVisible', trayVisibleOn)"
+      />
+      <span class="field-label">显示托盘图标</span>
+    </label>
+    <span class="field-hint">关闭后托盘图标隐藏,在此处随时恢复</span>
+
+    <button class="reset-pos-btn" type="button" @click="emit('quit')">退出 atoll</button>
 
     <!-- 状态反馈:仅在有事发生时出现(自动保存成功/凭据为空阻断),平时不占视觉 -->
     <div v-if="savedAtText !== ''" class="autosave-status">{{ savedAtText }}</div>

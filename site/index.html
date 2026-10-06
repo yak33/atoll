@@ -57,8 +57,8 @@
     <h1>额度还剩多少，<br />瞟一眼就知道。</h1>
     <p class="lede">atoll 是钉在 Windows 屏幕顶部的灵动岛组件：智谱 GLM Coding Plan 的 5 小时与 7 天滚动用量、重置倒计时、限额告警，收进一颗 44 像素的药丸。</p>
     <div class="hero-cta">
-      <a class="btn-primary" href="https://github.com/yak33/atoll/releases/download/v0.2.8/atoll_0.2.8_x64-setup.exe">下载 Windows 版</a>
-      <a class="btn-secondary" href="https://github.com/yak33/atoll/releases/tag/v0.2.8">v0.2.8 更新说明</a>
+      <a class="btn-primary" href="https://github.com/yak33/atoll/releases/download/v0.2.9/atoll_0.2.9_x64-setup.exe">下载 Windows 版</a>
+      <a class="btn-secondary" href="https://github.com/yak33/atoll/releases/tag/v0.2.9">v0.2.9 更新说明</a>
     </div>
     <p class="hero-meta">2.86 MiB · Windows 10 / 11 免管理员安装</p>
   </div>
@@ -161,7 +161,7 @@
 
 <!-- ============ 两个模块 ============ -->
 <section class="modules" id="modules">
-  <h2 class="section-title">礁盘上目前长着两座岛。</h2>
+  <h2 class="section-title">礁盘上目前长着三座岛。</h2>
   <p class="section-sub">atoll 的名字来自环礁：主程序是礁盘，每个功能模块是礁盘上长出的一座小岛。新模块按「独立核心逻辑 + 独立药丸与面板」追加，互不污染。</p>
 
   <article class="module-row reveal">
@@ -170,6 +170,7 @@
         <div class="module-tabs">
           <button class="tab-btn tab-btn-active" type="button">用量</button>
           <button class="tab-btn" type="button">番茄</button>
+          <button class="tab-btn" type="button">剪贴</button>
         </div>
         <div class="panel-header">
           <span class="plan">GLM Coding Plan Max</span>
@@ -225,6 +226,7 @@
         <div class="module-tabs">
           <button class="tab-btn" type="button">用量</button>
           <button class="tab-btn tab-btn-active" type="button">番茄</button>
+          <button class="tab-btn" type="button">剪贴</button>
         </div>
         <div class="pomo-title">番茄钟</div>
         <div class="pomo-stage">
@@ -237,6 +239,36 @@
         </div>
         <div class="pomo-hint">工作 30 分钟 · 休息 10 分钟</div>
       </div>
+    </div>
+  </article>
+
+  <article class="module-row reveal">
+    <div class="desk module-desk">
+      <div class="panel clip-panel">
+        <div class="module-tabs">
+          <button class="tab-btn" type="button">用量</button>
+          <button class="tab-btn" type="button">番茄</button>
+          <button class="tab-btn tab-btn-active" type="button">剪贴</button>
+        </div>
+        <input class="clip-search" type="text" placeholder="搜索剪贴板历史…" />
+        <div class="clip-list">
+          <div class="clip-row clip-row-pinned"><span class="clip-text">npm run tauri build</span><span class="clip-time">置顶</span></div>
+          <div class="clip-row"><span class="clip-text">git rebase -i HEAD~3</span><span class="clip-time">刚刚</span></div>
+          <div class="clip-row"><span class="clip-text">postgresql://user:pass@localhost:5432/mydb</span><span class="clip-time">5 分钟前</span></div>
+          <div class="clip-row"><span class="clip-text">按当前速度预计 1.8 小时后耗尽 —— 好眼熟？是的，用量模块的预测行也进历史</span><span class="clip-time">1 小时前</span></div>
+        </div>
+        <div class="clip-foot">点击条目复制 · 仅记录文本 · 数据只在本机</div>
+      </div>
+    </div>
+    <div class="module-text">
+      <h3>剪贴板历史</h3>
+      <p>复制过的文本自动进历史，要找回来时搜一下、点一下就回到剪贴板。</p>
+      <ul class="fact-list">
+        <li>Win32 消息事件驱动监听，零轮询；仅记录纯文本，图像与文件自动忽略</li>
+        <li>重复复制自动去重置顶；上限 200 条，置顶条目豁免淘汰</li>
+        <li>即时搜索 + 点击复制 + 置顶 / 删除 / 清空</li>
+        <li>数据只在本机，不联网不上传；设置里可一键关闭记录</li>
+      </ul>
     </div>
   </article>
 </section>
@@ -313,7 +345,7 @@
     <div><dt>安装包体积</dt><dd>2.86<span> MiB</span></dd></div>
     <div><dt>常驻内存</dt><dd>138<span> MB</span></dd></div>
     <div><dt>自动轮询</dt><dd>5<span> 分钟 / 次 + 随机抖动</span></dd></div>
-    <div><dt>单元测试</dt><dd>55<span> 个</span></dd></div>
+    <div><dt>单元测试</dt><dd>65<span> 个</span></dd></div>
   </dl>
   <p class="metrics-note">内存是任务管理器「私有工作集」口径的实测值。Tauri 主进程约 30 MB，其余是 WebView2 多进程底噪，每个进程约 18 MB，空页面同理。</p>
 </section>
@@ -323,7 +355,7 @@
   <div class="download-cta reveal">
     <h2>装上就能用。</h2>
     <p>下载安装包，双击安装，打开后点药丸进设置填 API Key。</p>
-    <a class="btn-primary btn-lg" href="https://github.com/yak33/atoll/releases/download/v0.2.8/atoll_0.2.8_x64-setup.exe">下载 atoll_0.2.8_x64-setup.exe</a>
+    <a class="btn-primary btn-lg" href="https://github.com/yak33/atoll/releases/download/v0.2.9/atoll_0.2.9_x64-setup.exe">下载 atoll_0.2.9_x64-setup.exe</a>
     <a class="text-link" href="https://github.com/yak33/atoll/releases">查看全部版本</a>
   </div>
   <div class="download-req">

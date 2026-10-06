@@ -1068,3 +1068,24 @@ html.js .states-demo .reveal:nth-child(3) { transition-delay: 0.16s; }
   .hero-panel { transition: none; }
   .btn-primary:hover { transform: none; }
 }
+
+/* ============ 剪贴板历史模块卡 ============ */
+.clip-panel { align-items: stretch; gap: 8px; }
+.clip-search {
+  box-sizing: border-box; width: 100%; height: 26px; padding: 0 8px;
+  border-radius: 8px; border: 1px solid var(--border-soft);
+  background: var(--surface-overlay); color: var(--text-primary);
+  font-size: 11px; font-family: inherit; outline: none;
+}
+.clip-list { display: flex; flex-direction: column; gap: 4px; }
+.clip-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border-radius: 8px; background: var(--surface-overlay);
+}
+.clip-row-pinned { border: 1px solid rgba(34, 197, 94, 0.3); }
+.clip-text {
+  flex: 1; min-width: 0; font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.clip-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.clip-foot { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 2px; }

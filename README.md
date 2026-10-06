@@ -6,15 +6,15 @@
 
 **钉在 Windows 屏幕顶部的灵动岛悬浮组件**
 
-智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 多模块扩展容器
+智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.8-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.9-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-zinc?style=flat-square)](LICENSE)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.8)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.9)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -50,12 +50,18 @@
 - **双阶段流转**：专注与休息自动切换，阶段完成桌面 Toast 提醒；番茄钟运行中微弱心跳呼吸律动。
 - **随时调节**：工作时长（5~60 分钟）与休息时长自由滑杆配置，下一阶段即时生效。
 
-### 3. 6 款调优质感皮肤与 11 种偶发流光
+### 3. 剪贴板历史模块
+- **事件驱动记录**：Win32 `AddClipboardFormatListener` 消息监听（clipboard-rs），零轮询；仅记录纯文本，图像/文件自动忽略。
+- **去重置顶**：重复复制同内容不产生冗余条目，原条目自动回到顶部；上限 200 条，置顶条目豁免淘汰。
+- **搜索与一键复制**：即时子串搜索，点击条目复制回剪贴板；支持置顶、删除、清空。
+- **数据只在本机**：不联网不上传；设置中可一键关闭记录或清空历史。
+
+### 4. 6 款调优质感皮肤与 11 种偶发流光
 - **6 套质感皮肤**：黑曜石（经典翠绿）、深海蓝（科技冰蓝）、极光紫（暗夜霓虹）、赤焰橙（暖意落日）、薄荷绿（清爽森系）、钛金金（哑黑钛金），底壳色调、高光游标与设置面板全局联动。
 - **11 种偶发物理流光**：边框流光、彗星拖尾、双流光、粒子对撞、波纹扩散、双波汇流、声呐涟漪、极光色散、月食金边、斜向扫光、星火微闪，让桌面充满生命力。
 - **深浅自适应**：浅色、深色、跟随 Windows 系统无缝自动切换。
 
-### 4. 极致克制的不打扰体验
+### 5. 极致克制的不打扰体验
 - **全屏自动隐藏**：检测到前台窗口全屏（游戏、全屏看片、PPT 演示投屏）灵动岛瞬时隐身，退出全屏自动恢复。
 - **系统托盘实时监控**：
   - 鼠标悬停右下角托盘图标即可看实时状态：`atoll · 5h: 24% | 7d: 45%` 或 `atoll · 🍅 专注 22:15`；
@@ -83,7 +89,7 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.8_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.9_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后点击顶部药丸胶囊，在用量设置中粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
@@ -106,12 +112,13 @@ atoll/
 │   │   ├── theme.ts             # 主题与 6 款皮肤切换, 系统深浅实时响应
 │   │   ├── tray.ts              # 系统托盘 Tooltip 实时状态同步
 │   │   ├── windowLayout.ts      # 窗口多状态物理尺寸计算与高分屏缩放适配
-│   │   └── fullscreenWatch.ts   # Rust 前台窗口探测驱动的全屏自动隐藏
+│   │   ├── fullscreenWatch.ts   # Rust 前台窗口探测驱动的全屏自动隐藏
+│   │   └── clipboardHistory.ts  # 剪贴板历史: 去重置顶/上限淘汰/搜索
 │   ├── composables/     # useGlowEffects(偶发流光触发器) / nowTick(应用时钟)
 │   ├── components/      # 各模块 Pill/Panel 组件对 + ModuleTabs + SettingsPanel
 │   ├── islandModules.ts # 模块注册表: 挂载/滚轮环形切换/尺寸/Tab 全由它驱动
 │   └── App.vue          # 三态状态机、全局 CSS 变量、偶发流光系统与切屏容器
-├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 开机自启
+├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 剪贴板监听 / 开机自启
 └── site/                # Vercel 静态落地页 (HTML/CSS/JS 零构建)
 ```
 
@@ -120,9 +127,9 @@ atoll/
 - **安全鉴权**：遵循智谱官方协议直接发送裸 API Key（不加 `Bearer` 前缀）。
 - **绿色低耗**：
   - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
-  - 安装包大小仅 **~2.86 MiB**；
+  - 安装包大小仅 **~2.89 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
-  - **55 个单元测试全部自动化通过**。
+  - **65 个单元测试全部自动化通过**。
 
 ---
 

@@ -3,13 +3,20 @@
  * 全部使用物理像素(与 Tauri 的 outerPosition/currentMonitor 同单位),
  * 逻辑像素换算由调用方(App)按 scaleFactor 处理。
  *
- * 分边策略:上下边「隐入留 3px 霓虹线」;左右边「收缩成 44×44 迷你岛」
- * ——横向药丸向左右隐入只剩 3px×44 竖线,信号太弱,故改收缩当徽章。
+ * 用户拍板交互原则:
+ * 1. 始终保持胶囊形态,坚决不要方形小徽章;
+ * 2. 仅贴近屏幕顶部且静止时,才折叠为上方 3px 霓虹横条;
+ * 3. 左右两侧与底部无论拖入多少,松手/离开后均自动弹回屏内完整呈现胶囊。
  *
  * @author ZHANGCHAO 2026/10/06
  */
 
 export type DockEdge = 'top' | 'bottom' | 'left' | 'right'
+
+/** 是否属于允许折叠的方向:仅贴顶允许折叠为横条 */
+export function isDockableEdge(edge: DockEdge): boolean {
+  return edge === 'top'
+}
 
 /** 统一矩形(物理像素) */
 export interface Rect {

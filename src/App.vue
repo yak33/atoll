@@ -223,11 +223,25 @@ async function handleAppearance(next: AppearanceSettings): Promise<void> {
   }
 }
 
-/** 展开面板拖动:交给系统移动窗口。新位置不在此处读取——
- *  收回/切换状态时统一读窗口真实位置并持久化(见 enterMode)。 */
+async function persistCurrentWindowPosition(): Promise<void> {
+  try {
+    const win = getCurrentWindow()
+    const pos = await win.outerPosition()
+    if (lastPersistedPos === null || pos.x !== lastPersistedPos.x || pos.y !== lastPersistedPos.y) {
+      lastPersistedPos = { x: pos.x, y: pos.y }
+      await savePillPosition(lastPersistedPos)
+    }
+  } catch {
+    // 忽略持久化失败
+  }
+}
+
+/** 展开面板拖动:交给系统移动窗口。拖动松手后立即出屏弹回并持久化 */
 async function handleDragStart(): Promise<void> {
   cancelCollapse()
   await getCurrentWindow().startDragging()
+  await snapIntoWorkArea()
+  await persistCurrentWindowPosition()
 }
 
 /** 设置面板「重置位置」:清锚点并立即回到顶部居中(设置态下移动设置窗口本身) */
@@ -467,7 +481,6 @@ onBeforeUnmount(() => {
 async function enterMode(target: IslandMode): Promise<void> {
   // 折叠态先恢复窗口原形态,否则 resizeInPlace 会以折叠矩形为锚点伸缩
   if (dockEdge.value !== null) {
-    suppressHoverUntil = Date.now() + 1200
     await undock()
   }
   mode.value = target
@@ -483,8 +496,9 @@ async function enterMode(target: IslandMode): Promise<void> {
       // 持久化失败仅影响下次启动落位
     }
   }
-  // 切换回收起态药丸时,安排贴边折叠倒计时
+  // 切换回收起态药丸时,若有出屏则自动弹回,并安排贴顶折叠倒计时
   if (target === 'pill') {
+    await snapIntoWorkArea()
     scheduleDock()
   }
 }
@@ -509,22 +523,103 @@ function cancelExpand(): void {
   }
 }
 
+/**
+ * 窗口出屏弹回:将拖出屏幕边缘的胶囊完整拉回工作区内贴边显示。
+ * 用户拍板:始终保持胶囊形态,不要方形小徽章;不管拖进去多少,松手/离开后都弹出来展示全样。
+ */
+async function snapIntoWorkArea(): Promise<void> {
+  // 折叠态(顶部横条)由折叠规则管辖,不处理
+  if (dockEdge.value !== null) return
+  const win = getCurrentWindow()
+  try {
+    const [pos, size, curMon] = await Promise.all([
+      win.outerPosition(),
+      win.innerSize(),
+      currentMonitor().catch(() => null),
+    ])
+    const monitor = curMon ?? (await primaryMonitor().catch(() => null))
+    if (monitor === null) return
+    const w = Math.round(size.width)
+    const h = Math.round(size.height)
+    const work = monitor.workArea
+    const isOffscreen =
+      pos.x < work.position.x ||
+      pos.x + w > work.position.x + work.size.width ||
+      pos.y < work.position.y ||
+      pos.y + h > work.position.y + work.size.height
+    if (isOffscreen) {
+      const clamped = clampIntoWorkArea(pos, w, h, work)
+      await win.setPosition(clamped)
+      await persistCurrentWindowPosition()
+    }
+  } catch {
+    // 静默安全兜底
+  }
+}
+
+// ===== 收起态胶囊直接拖拽 =====
+const DRAG_THRESHOLD_PX = 4
+let pillDragArmed = false
+let pillDownX = 0
+let pillDownY = 0
+let pillDragMoved = false
+
+function handlePillMouseDown(event: MouseEvent): void {
+  if (event.button !== 0) return
+  pillDragArmed = true
+  pillDragMoved = false
+  pillDownX = event.clientX
+  pillDownY = event.clientY
+}
+
+async function handlePillMouseMove(event: MouseEvent): Promise<void> {
+  if (!pillDragArmed) return
+  const moved = Math.abs(event.clientX - pillDownX) + Math.abs(event.clientY - pillDownY)
+  if (moved > DRAG_THRESHOLD_PX) {
+    pillDragArmed = false
+    pillDragMoved = true
+    cancelExpand()
+    cancelDock()
+    if (dockEdge.value !== null) {
+      await undock()
+    }
+    await getCurrentWindow().startDragging()
+    // 拖动松手后:立即弹回屏内(不管拖进去多少,松手后都弹出来展示全样)
+    await snapIntoWorkArea()
+    await persistCurrentWindowPosition()
+    scheduleDock()
+  }
+}
+
+function handlePillMouseUp(): void {
+  pillDragArmed = false
+}
+
+async function handlePillClick(): Promise<void> {
+  // 若刚才发生了拖拽位移,松手不触发点击打开设置
+  if (pillDragMoved) {
+    pillDragMoved = false
+    return
+  }
+  await openSettings()
+}
+
 function handlePillHover(): void {
   if (mode.value !== 'pill') return
-  // 刚从折叠态唤回时鼠标就在岛上,这不是浏览意图,短抑制 hover 展开
-  if (Date.now() < suppressHoverUntil) return
   cancelDock()
   scheduleExpand()
 }
 
-function handlePillLeave(): void {
+async function handlePillLeave(): Promise<void> {
   cancelExpand()
+  // 无论拖进去多少,鼠标离开后都立即弹出来完整呈现
+  await snapIntoWorkArea()
   scheduleDock()
 }
 
 // ===== 贴边微折叠(F1) =====
-// 触发:收起态鼠标离开药丸 3 秒;方向跟随最近屏幕边缘;
-// 上下边隐入留 3px 霓虹线,左右边收缩成 44×44 迷你岛(分边策略见 core/edgeDock.ts)。
+// 规则:不要方形小徽章,始终保持胶囊形态;只有贴近屏幕顶部且静止时,才折叠为顶部 3px 霓虹横条。
+// 左右/底部无论拖入多少,松手/离开后均自动弹回屏内完整呈现胶囊。
 // 优先级:托盘手动隐藏 / 全屏隐藏 > 折叠;任何状态切换先解除折叠。
 
 const DOCK_DELAY_MS = 3000
@@ -534,8 +629,6 @@ const soundEnabled = ref(true)
 /** 折叠前形态,唤回时恢复 */
 let dockOrigin: { pos: PhysicalPosition; size: LogicalSize } | null = null
 let dockTimer = 0
-/** 折叠唤回后的 hover 展开抑制截止时刻 */
-let suppressHoverUntil = 0
 
 function cancelDock(): void {
   if (dockTimer !== 0) {
@@ -555,13 +648,17 @@ function scheduleDock(): void {
 }
 
 async function dockNow(): Promise<void> {
-  if (mode.value !== 'pill' || dockEdge.value !== null) return
+  if (mode.value !== 'pill' || dockEdge.value !== null || manualHidden.value) return
   const win = getCurrentWindow()
   try {
-    const [pos, size, curMon] = await Promise.all([win.outerPosition(), win.innerSize(), currentMonitor()])
-    const monitor = curMon ?? (await primaryMonitor())
+    const [pos, size, curMon] = await Promise.all([
+      win.outerPosition(),
+      win.innerSize(),
+      currentMonitor().catch(() => null),
+    ])
+    const monitor = curMon ?? (await primaryMonitor().catch(() => null))
     if (monitor === null) return
-    const scaleFactor = monitor.scaleFactor
+    const scaleFactor = monitor.scaleFactor || 1
     // 均为物理像素:窗口矩形与工作区矩形同单位参与判定
     const winRect: Rect = {
       x: pos.x,
@@ -576,14 +673,20 @@ async function dockNow(): Promise<void> {
       height: monitor.workArea.size.height,
     }
     const edge = nearestEdge(winRect, workRect)
-    const target = dockedRect(edge, winRect, workRect, scaleFactor)
+    // 用户拍板:始终保持胶囊形态,不要方形小徽章;仅贴近屏幕顶部才折叠为上方 3px 霓虹横条
+    const topMarginPhysical = Math.round(24 * scaleFactor)
+    if (edge !== 'top' || winRect.y > workRect.y + topMarginPhysical) {
+      return
+    }
+
+    const target = dockedRect('top', winRect, workRect, scaleFactor)
     dockOrigin = {
       pos,
       size: new LogicalSize(Math.round(size.width / scaleFactor), Math.round(size.height / scaleFactor)),
     }
-    dockEdge.value = edge
     await win.setSize(new LogicalSize(Math.round(target.width / scaleFactor), Math.round(target.height / scaleFactor)))
     await win.setPosition(new PhysicalPosition(target.x, target.y))
+    dockEdge.value = 'top'
   } catch (err) {
     console.error('[atoll] dockNow failed:', err)
     dockEdge.value = null
@@ -592,31 +695,39 @@ async function dockNow(): Promise<void> {
 }
 
 async function undock(): Promise<void> {
-  if (dockEdge.value === null) return
-  dockEdge.value = null
+  if (dockEdge.value === null && dockOrigin === null) return
   const origin = dockOrigin
   dockOrigin = null
-  if (origin === null) return
+  dockEdge.value = null
   const win = getCurrentWindow()
   try {
-    // 恢复位置钳进工作区:拖一半出屏后折叠,唤回必须完整可见(否则又是「消失」)
-    const monitor = await currentMonitor()
-    let restore = origin.pos
-    if (monitor !== null) {
-      restore = clampIntoWorkArea(origin.pos, origin.size.width * monitor.scaleFactor, origin.size.height * monitor.scaleFactor, monitor.workArea)
+    const targetSize = origin?.size ?? pillSize()
+    let monitor = await currentMonitor().catch(() => null)
+    if (monitor === null) {
+      monitor = await primaryMonitor().catch(() => null)
     }
-    await win.setSize(origin.size)
-    await win.setPosition(restore)
-  } catch {
-    // 恢复失败:折叠标记已解除,尺寸异常由下次状态切换修正
+    let restore = origin?.pos
+    if (monitor !== null) {
+      const scaleFactor = monitor.scaleFactor || 1
+      const physicalWidth = Math.round(targetSize.width * scaleFactor)
+      const physicalHeight = Math.round(targetSize.height * scaleFactor)
+      if (restore) {
+        restore = clampIntoWorkArea(restore, physicalWidth, physicalHeight, monitor.workArea)
+      }
+    }
+    await win.setSize(targetSize)
+    if (restore) {
+      await win.setPosition(restore)
+    }
+  } catch (err) {
+    console.error('[atoll] undock failed:', err)
   }
 }
 
-/** 折叠态迷你岛的唤回手势 */
+/** 顶部霓虹横条的唤回手势:移入立即恢复完整胶囊 */
 async function handleDockRestore(): Promise<void> {
-  suppressHoverUntil = Date.now() + 1200
+  cancelDock()
   await undock()
-  scheduleDock()
 }
 
 // ===== 窗口出屏守卫(轮询版) =====
@@ -831,13 +942,6 @@ watchEffect(() => {
   }
 })
 
-/** 折叠态迷你方块的徽章内容:按模块显示最简状态(线形态不显示) */
-const dockBadge = computed(() => {
-  if (activeModule.value === 'pomodoro') return pomoClockText.value
-  if (activeModule.value === 'clipboard') return '📋'
-  return primary.value !== null ? `${Math.round(primary.value.usedPercent)}%` : '--'
-})
-
 // ===== 动态挂载接线:各模块的 props/events 在此集中组装 =====
 // 这是新模块唯一的「接线点」:注册表加一条 + 这里加一个分支,模板与切换逻辑零改动。
 
@@ -908,27 +1012,33 @@ const panelEvents = computed<Record<string, unknown>>(() => {
 </script>
 
 <template>
-  <!-- 收起态:优先渲染贴边折叠态的迷你岛;否则注册表动态挂载药丸 -->
-  <Transition v-if="mode === 'pill'" :name="'pill-slide-' + wheelDirection" mode="out-in">
+  <!-- 收起态:外层壳支持直接拖拽;贴顶折叠渲染横条,否则渲染胶囊药丸 -->
+  <div
+    v-if="mode === 'pill'"
+    class="pill-shell"
+    @mousedown="handlePillMouseDown"
+    @mousemove="handlePillMouseMove"
+    @mouseup="handlePillMouseUp"
+  >
     <MiniIsland
       v-if="dockEdge !== null"
       key="docked"
       :edge="dockEdge"
-      :badge="dockBadge"
       @mouseenter="handleDockRestore"
       @click="openSettings"
     />
-    <component
-      :is="moduleDef.pill"
-      v-else
-      :key="moduleDef.id"
-      v-bind="pillProps"
-      @click="openSettings"
-      @mouseenter="handlePillHover"
-      @mouseleave="handlePillLeave"
-      @wheel="handlePillWheel"
-    />
-  </Transition>
+    <Transition v-else :name="'pill-slide-' + wheelDirection" mode="out-in">
+      <component
+        :is="moduleDef.pill"
+        :key="moduleDef.id"
+        v-bind="pillProps"
+        @click="handlePillClick"
+        @mouseenter="handlePillHover"
+        @mouseleave="handlePillLeave"
+        @wheel="handlePillWheel"
+      />
+    </Transition>
+  </div>
 
   <!-- 展开态:注册表动态挂载面板;Tab 切换,滚轮切模块,模块特有事件由 panelEvents 组装 -->
   <component
@@ -1142,6 +1252,12 @@ html[data-theme='light'][data-skin='cyber'] {
   background: rgba(var(--accent-rgb) / 0.16);
   border-color: rgba(var(--accent-rgb) / 0.4);
   color: var(--accent-color);
+}
+
+/* 收起态拖拽外壳:撑满窗口,手势自然冒泡 */
+.pill-shell {
+  width: 100%;
+  height: 100vh;
 }
 
 /* ===== 药丸基座(全局):用量/番茄两种药丸共用的容器外观 ===== */

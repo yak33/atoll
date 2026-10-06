@@ -4,12 +4,21 @@
  * @author ZHANGCHAO 2026/10/06
  */
 import { describe, expect, it } from 'vitest'
-import { DOCK_LINE_HEIGHT, DOCK_MINI_SIZE, dockedRect, nearestEdge, type Rect } from './edgeDock'
+import { DOCK_LINE_HEIGHT, DOCK_MINI_SIZE, dockedRect, isDockableEdge, nearestEdge, type Rect } from './edgeDock'
 
 // 工作区:1920×1080 @ (0,0)
 const WORK: Rect = { x: 0, y: 0, width: 1920, height: 1080 }
 // 药丸:260×44 顶部居中
 const PILL: Rect = { x: 830, y: 6, width: 260, height: 44 }
+
+describe('isDockableEdge', () => {
+  it('只有 top 允许折叠为横条;其余边缘坚决保持胶囊形态', () => {
+    expect(isDockableEdge('top')).toBe(true)
+    expect(isDockableEdge('bottom')).toBe(false)
+    expect(isDockableEdge('left')).toBe(false)
+    expect(isDockableEdge('right')).toBe(false)
+  })
+})
 
 describe('nearestEdge', () => {
   it('顶部居中的药丸判为 top', () => {

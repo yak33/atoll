@@ -22,7 +22,7 @@ const emit = defineEmits<{
   mouseenter: []
   mouseleave: []
   dragstart: []
-  copy: [text: string]
+  copy: [item: ClipboardItem]
   remove: [id: string]
   pin: [id: string]
   clear: []
@@ -31,6 +31,41 @@ const emit = defineEmits<{
 
 const keyword = ref('')
 const filtered = computed(() => searchClipboard(props.items, keyword.value))
+
+// ===== 悬停长文本 / 图片毛玻璃预览卡片 (方案 B) =====
+const previewItem = ref<ClipboardItem | null>(null)
+let previewTimer: number | null = null
+
+function onRowMouseEnter(item: ClipboardItem): void {
+  cancelPreview()
+  previewTimer = window.setTimeout(() => {
+    previewTimer = null
+    previewItem.value = item
+  }, 220)
+}
+
+function onRowMouseLeave(): void {
+  cancelPreview()
+  previewTimer = window.setTimeout(() => {
+    previewTimer = null
+    previewItem.value = null
+  }, 120)
+}
+
+function cancelPreview(): void {
+  if (previewTimer !== null) {
+    clearTimeout(previewTimer)
+    previewTimer = null
+  }
+}
+
+function onCardMouseEnter(): void {
+  cancelPreview()
+}
+
+function onCardMouseLeave(): void {
+  previewItem.value = null
+}
 
 function timeOf(copiedAt: number): string {
   const diffMin = Math.floor((nowTick.value - copiedAt) / 60_000)
@@ -49,7 +84,7 @@ let downY = 0
 
 function onPanelMouseDown(event: MouseEvent): void {
   if (event.button !== 0) return
-  if ((event.target as HTMLElement).closest('button, input') !== null) return
+  if ((event.target as HTMLElement).closest('button, input, .preview-card') !== null) return
   armed = true
   downX = event.clientX
   downY = event.clientY
@@ -87,26 +122,69 @@ function onPanelMouseUp(): void {
 
     <div class="list">
       <div v-if="filtered.length === 0" class="empty">
-        {{ items.length === 0 ? (enabled ? '复制点文本,这里就会出现' : '记录已关闭,可在设置中开启') : '没有匹配的条目' }}
+        {{ items.length === 0 ? (enabled ? '复制点文本或截图,这里就会出现' : '记录已关闭,可在设置中开启') : '没有匹配的条目' }}
       </div>
       <div
         v-for="item in filtered"
         :key="item.id"
         class="row"
-        :title="`${timeOf(item.copiedAt)} · 点击复制`"
-        @click="emit('copy', item.text)"
+        :title="item.kind === 'image' ? (item.width && item.height ? `图片 ${item.width}×${item.height}` : '图片') : item.text"
+        @mouseenter="onRowMouseEnter(item)"
+        @mouseleave="onRowMouseLeave"
+        @click="emit('copy', item)"
       >
-        <span class="row-text">{{ summarize(item.text, 120) }}</span>
+        <template v-if="item.kind === 'image'">
+          <img v-if="item.dataUrl" :src="item.dataUrl" class="row-thumb" alt="thumb" />
+          <span v-else class="row-thumb-placeholder">🖼️</span>
+          <span class="row-text row-image-title">
+            图片
+            <span v-if="item.width && item.height" class="row-dim">{{ item.width }}×{{ item.height }}</span>
+          </span>
+        </template>
+        <template v-else>
+          <span class="row-text">{{ summarize(item.text, 120) }}</span>
+        </template>
         <span class="row-time">{{ timeOf(item.copiedAt) }}</span>
-        <button class="row-btn" type="button" title="置顶/取消置顶" @click.stop="emit('pin', item.id)">
+        <button class="row-btn" type="button" :title="item.pinned ? '取消置顶' : '置顶'" @click.stop="emit('pin', item.id)">
           {{ item.pinned ? '📌' : '📍' }}
         </button>
         <button class="row-btn row-btn-danger" type="button" title="删除" @click.stop="emit('remove', item.id)">✕</button>
       </div>
     </div>
 
+    <!-- 悬停长文本 / 图片毛玻璃预览浮层 (方案 B) -->
+    <Transition name="preview-fade">
+      <div
+        v-if="previewItem"
+        class="preview-card"
+        :title="previewItem.kind === 'image' ? '点击复制图片' : '点击复制完整文本'"
+        @mouseenter="onCardMouseEnter"
+        @mouseleave="onCardMouseLeave"
+        @click.stop="emit('copy', previewItem)"
+      >
+        <div class="preview-header">
+          <div class="preview-meta">
+            <span class="preview-badge">{{ previewItem.kind === 'image' ? '图片预览' : '完整预览' }}</span>
+            <span v-if="previewItem.kind === 'image' && previewItem.width && previewItem.height" class="preview-count">
+              {{ previewItem.width }} × {{ previewItem.height }} px
+            </span>
+            <span v-else-if="previewItem.kind !== 'image'" class="preview-count">
+              {{ previewItem.text.length }} 字符
+            </span>
+            <span class="preview-time">{{ timeOf(previewItem.copiedAt) }}</span>
+          </div>
+          <span class="preview-hint">{{ previewItem.kind === 'image' ? '点击复制 🖼️' : '点击复制 📋' }}</span>
+        </div>
+        <div v-if="previewItem.kind === 'image'" class="preview-image-box">
+          <img v-if="previewItem.dataUrl" :src="previewItem.dataUrl" class="preview-img" alt="preview" />
+          <div v-else class="preview-img-fallback">暂无缩略图</div>
+        </div>
+        <div v-else class="preview-body">{{ previewItem.text }}</div>
+      </div>
+    </Transition>
+
     <div class="footer">
-      <span class="hint">点击条目复制 · 仅记录文本 · 数据只在本机</span>
+      <span class="hint">点击条目复制 · 悬停查看全部 · 数据只在本机</span>
       <button class="clear-btn" type="button" :disabled="items.length === 0" @click="emit('clear')">清空</button>
     </div>
   </div>
@@ -114,6 +192,7 @@ function onPanelMouseUp(): void {
 
 <style scoped>
 .panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -240,6 +319,40 @@ function onPanelMouseUp(): void {
   text-overflow: ellipsis;
 }
 
+.row-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-soft);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.row-thumb-placeholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  background: var(--surface-overlay);
+  flex-shrink: 0;
+}
+
+.row-image-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.row-dim {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .row-time {
   font-size: 10px;
   color: var(--text-muted);
@@ -298,5 +411,121 @@ function onPanelMouseUp(): void {
 .clear-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ===== 方案 B: 悬停毛玻璃完整预览浮层 ===== */
+.preview-card {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 42px;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-color, #4ade80);
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.55), 0 0 16px rgb(var(--accent-rgb, 34 197 94) / 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  z-index: 20;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  cursor: pointer;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(var(--accent-rgb, 34 197 94) / 0.2);
+  color: var(--accent-color, #4ade80);
+}
+
+.preview-count,
+.preview-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.preview-hint {
+  font-size: 10px;
+  color: var(--accent-color, #4ade80);
+  font-weight: 600;
+}
+
+.preview-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-primary);
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace, sans-serif;
+  user-select: text;
+  cursor: text;
+}
+
+.preview-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.preview-body::-webkit-scrollbar-thumb {
+  background: var(--border-soft);
+  border-radius: 2px;
+}
+
+.preview-image-box {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.preview-img {
+  max-width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.preview-img-fallback {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.preview-fade-enter-active,
+.preview-fade-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.preview-fade-enter-from,
+.preview-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
 }
 </style>

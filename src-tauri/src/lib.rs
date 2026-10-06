@@ -83,39 +83,172 @@ fn set_tray_tooltip(app: tauri::AppHandle, tooltip: String) -> Result<(), String
 
 /**
  * 剪贴板模块(H2):clipboard-rs 的 watcher 走 Win32 AddClipboardFormatListener
- * 消息,事件驱动零轮询。只把「纯文本」变化推给前端;图像/文件复制时 get_text
- * 返回 Err,自然被过滤。开关语义在前端(关闭记录时前端忽略事件,不落盘)。
+ * 消息,事件驱动零轮询。支持纯文本与图像两类内容:
+ * - 纯文本:触发 clipboard:text-changed
+ * - 图像(截图/复制图片):落盘缓存 + 缩略图,触发 clipboard:image-changed
+ * - 写回剪贴板:分别提供 write_clipboard_text 与 write_clipboard_image
  */
 mod clipboard_watch {
     use super::*;
-    // get_text/set_text 在 Clipboard trait 上,add_handler/start_watch 在 ClipboardWatcher trait 上
-    use clipboard_rs::{Clipboard, ClipboardWatcher};
+    use clipboard_rs::{common::RustImage, Clipboard, ClipboardWatcher};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use tauri::Manager;
 
-    struct TextHandler {
-        app: tauri::AppHandle,
-        ctx: clipboard_rs::ClipboardContext,
+    #[derive(serde::Serialize, Clone)]
+    pub struct ClipboardImagePayload {
+        pub path: String,
+        pub data_url: String,
+        pub width: u32,
+        pub height: u32,
     }
 
-    impl clipboard_rs::ClipboardHandler for TextHandler {
+    struct ClipHandler {
+        app: tauri::AppHandle,
+        ctx: clipboard_rs::ClipboardContext,
+        img_dir: PathBuf,
+        last_text: String,
+        last_img_hash: u64,
+    }
+
+    const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    fn bytes_to_base64(bytes: &[u8]) -> String {
+        let mut result = String::with_capacity((bytes.len() + 2) / 3 * 4);
+        for chunk in bytes.chunks(3) {
+            let b0 = chunk[0] as usize;
+            let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
+            let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
+            result.push(BASE64_CHARS[b0 >> 2] as char);
+            result.push(BASE64_CHARS[((b0 & 3) << 4) | (b1 >> 4)] as char);
+            if chunk.len() > 1 {
+                result.push(BASE64_CHARS[((b1 & 0xf) << 2) | (b2 >> 6)] as char);
+            } else {
+                result.push('=');
+            }
+            if chunk.len() > 2 {
+                result.push(BASE64_CHARS[b2 & 0x3f] as char);
+            } else {
+                result.push('=');
+            }
+        }
+        result
+    }
+
+    impl clipboard_rs::ClipboardHandler for ClipHandler {
         fn on_clipboard_change(&mut self) {
-            // 非文本内容(图像/文件)读文本会 Err,静默跳过
+            // 1. 优先尝试文本
             if let Ok(text) = self.ctx.get_text() {
                 if !text.is_empty() {
-                    let _ = self.app.emit("clipboard:text-changed", text);
+                    if text != self.last_text {
+                        self.last_text = text.clone();
+                        self.last_img_hash = 0;
+                        let _ = self.app.emit("clipboard:text-changed", text);
+                    }
+                    return;
                 }
+            }
+
+            // 2. 检查是否为图片(截图/复制网页图像)
+            if let Ok(img) = self.ctx.get_image() {
+                if img.is_empty() {
+                    return;
+                }
+                let (w, h) = img.get_size();
+                if w == 0 || h == 0 {
+                    return;
+                }
+
+                // 编码为 PNG
+                let png_buf = match img.to_png() {
+                    Ok(buf) => buf,
+                    Err(_) => return,
+                };
+                let bytes = png_buf.get_bytes();
+                if bytes.is_empty() {
+                    return;
+                }
+
+                // 计算快照特征哈希去重防抖(长度 + 首尾样本 + 宽高)
+                let hash = (bytes.len() as u64)
+                    ^ ((bytes[0] as u64) << 32)
+                    ^ ((bytes[bytes.len() - 1] as u64) << 16)
+                    ^ ((w as u64) << 48)
+                    ^ (h as u64);
+                if hash == self.last_img_hash {
+                    return;
+                }
+                self.last_img_hash = hash;
+                self.last_text.clear();
+
+                // 生成缩略图 Data URL (宽限在 240px 内,轻量极速渲染)
+                let thumb_data_url = if w > 240 || h > 240 {
+                    match img.thumbnail(240, 240) {
+                        Ok(thumb) => match thumb.to_png() {
+                            Ok(t_buf) => format!("data:image/png;base64,{}", bytes_to_base64(t_buf.get_bytes())),
+                            Err(_) => format!("data:image/png;base64,{}", bytes_to_base64(bytes)),
+                        },
+                        Err(_) => format!("data:image/png;base64,{}", bytes_to_base64(bytes)),
+                    }
+                } else {
+                    format!("data:image/png;base64,{}", bytes_to_base64(bytes))
+                };
+
+                // 原图存入本地缓存目录
+                let now_ms = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis();
+                let file_name = format!("clip_{}.png", now_ms);
+                let full_path = self.img_dir.join(file_name);
+                if fs::write(&full_path, bytes).is_err() {
+                    return;
+                }
+
+                // 缓存清理:超过 30 张清理最老的缓存原图
+                if let Ok(entries) = fs::read_dir(&self.img_dir) {
+                    let mut files: Vec<PathBuf> = entries
+                        .filter_map(|e| e.ok().map(|e| e.path()))
+                        .filter(|p| p.extension().map_or(false, |ext| ext == "png"))
+                        .collect();
+                    if files.len() > 30 {
+                        files.sort_by_key(|p| p.metadata().and_then(|m| m.modified()).ok());
+                        for old in files.iter().take(files.len() - 30) {
+                            let _ = fs::remove_file(old);
+                        }
+                    }
+                }
+
+                let payload = ClipboardImagePayload {
+                    path: full_path.to_string_lossy().to_string(),
+                    data_url: thumb_data_url,
+                    width: w,
+                    height: h,
+                };
+                let _ = self.app.emit("clipboard:image-changed", payload);
             }
         }
     }
 
-    /// 启动剪贴板文本监听(幂等:重复调用时第二个 watcher 会因占用失败并静默返回)
+    /// 启动剪贴板监听(文本 + 图片)
     pub fn start(app: tauri::AppHandle) {
+        let img_dir = match app.path().app_data_dir() {
+            Ok(dir) => dir.join("clipboard_images"),
+            Err(_) => std::env::temp_dir().join("atoll_clipboard_images"),
+        };
+        let _ = fs::create_dir_all(&img_dir);
+
         std::thread::spawn(move || {
-            let handler = TextHandler {
+            let handler = ClipHandler {
                 app: app.clone(),
                 ctx: match clipboard_rs::ClipboardContext::new() {
                     Ok(ctx) => ctx,
                     Err(_) => return,
                 },
+                img_dir,
+                last_text: String::new(),
+                last_img_hash: 0,
             };
             let mut watcher = match clipboard_rs::ClipboardWatcherContext::new() {
                 Ok(watcher) => watcher,
@@ -127,12 +260,21 @@ mod clipboard_watch {
     }
 }
 
-/// 把文本写回系统剪贴板(剪贴板历史「点击复制」用)
+/// 把文本写回系统剪贴板(剪贴板历史「点击复制文本」用)
 #[tauri::command]
 fn write_clipboard_text(text: String) -> Result<(), String> {
     use clipboard_rs::Clipboard;
     let ctx = clipboard_rs::ClipboardContext::new().map_err(|e| e.to_string())?;
     ctx.set_text(text).map_err(|e| e.to_string())
+}
+
+/// 把本地图片写回系统剪贴板(剪贴板历史「点击复制图片」用)
+#[tauri::command]
+fn write_clipboard_image(path: String) -> Result<(), String> {
+    use clipboard_rs::{common::RustImage, Clipboard, RustImageData};
+    let img = RustImageData::from_path(&path).map_err(|e| e.to_string())?;
+    let ctx = clipboard_rs::ClipboardContext::new().map_err(|e| e.to_string())?;
+    ctx.set_image(img).map_err(|e| e.to_string())
 }
 
 /// 显示/隐藏托盘图标(设置面板「显示托盘图标」开关用)
@@ -186,6 +328,7 @@ pub fn run() {
             is_foreground_fullscreen,
             set_tray_tooltip,
             write_clipboard_text,
+            write_clipboard_image,
             set_tray_visible,
             quit_app
         ])

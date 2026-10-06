@@ -33,8 +33,10 @@ const { actionName } = useGlowEffects(() => props.glowEffects)
     @mouseleave="emit('mouseleave')"
     @wheel.prevent="emit('wheel', $event)"
   >
-    <span class="clip-icon">📋</span>
-    <span v-if="latest.length > 0" class="clip-latest">{{ summarize(latest[0].text, 46) }}</span>
+    <span class="clip-icon">{{ latest[0]?.kind === 'image' ? '🖼️' : '📋' }}</span>
+    <span v-if="latest.length > 0" class="clip-latest">
+      {{ latest[0].kind === 'image' ? (latest[0].width && latest[0].height ? `图片 ${latest[0].width}×${latest[0].height}` : '图片') : summarize(latest[0].text, 46) }}
+    </span>
     <span v-else-if="enabled" class="clip-empty">复制点什么试试</span>
     <span v-else class="clip-empty">记录已关闭</span>
     <span v-if="latest.length > 1" class="clip-count">{{ latest.length }}</span>

@@ -51,10 +51,12 @@ import {
   type UsageHistoryPoint,
 } from './core/usageHistory'
 import {
+  addClipboardImageItem,
   addClipboardItem,
   clearUnpinned,
   removeClipboardItem,
   togglePin,
+  type ClipboardImagePayload,
   type ClipboardItem,
 } from './core/clipboardHistory'
 import { invoke } from '@tauri-apps/api/core'
@@ -282,10 +284,11 @@ function handleUsageAlerts(next: UsageAlerts): void {
 }
 
 // ===== 剪贴板模块 =====
-// Rust 侧 watcher 事件驱动推文本过来;开关关闭时事件仍到达但不落盘(隐私急停)。
+// Rust 侧 watcher 事件驱动推文本或图像过来;开关关闭时事件仍到达但不落盘(隐私急停)。
 const clipboardItems = ref<ClipboardItem[]>([])
 const clipboardEnabled = ref(true)
 let unlistenClipboard: (() => void) | null = null
+let unlistenClipboardImage: (() => void) | null = null
 let clipboardSaveTimer: number | null = null
 
 /** 连续复制 400ms 防抖落盘,避免频繁刷写整个 store */
@@ -306,10 +309,16 @@ function flushSaveClipboard(): void {
 }
 
 /** 复制历史条目回剪贴板(Rust 命令);失败弹 toast 而非静默——用户有明确意图 */
-async function handleClipboardCopy(text: string): Promise<void> {
+async function handleClipboardCopy(itemOrText: ClipboardItem | string): Promise<void> {
   try {
-    await invoke('write_clipboard_text', { text })
-    void sendToast('已复制到剪贴板')
+    if (typeof itemOrText === 'object' && itemOrText.kind === 'image' && itemOrText.imagePath) {
+      await invoke('write_clipboard_image', { path: itemOrText.imagePath })
+      void sendToast('🖼️ 图片已复制到剪贴板')
+    } else {
+      const text = typeof itemOrText === 'string' ? itemOrText : itemOrText.text
+      await invoke('write_clipboard_text', { text })
+      void sendToast('已复制到剪贴板')
+    }
     if (soundEnabled.value) playSound('copy')
   } catch {
     void sendToast('复制失败,请重试')
@@ -450,6 +459,13 @@ onMounted(async () => {
     scheduleSaveClipboard()
   })
 
+  // 剪贴板图像变化(截图/复制网页图像);防抖落盘
+  unlistenClipboardImage = await listen<ClipboardImagePayload>('clipboard:image-changed', (event) => {
+    if (!clipboardEnabled.value) return
+    clipboardItems.value = addClipboardImageItem(clipboardItems.value, event.payload)
+    scheduleSaveClipboard()
+  })
+
   // 出屏守卫:2 秒轮询,静止且完全出屏时拉回主屏
   guardTimer = window.setInterval(() => {
     void guardOffscreen()
@@ -507,6 +523,7 @@ onBeforeUnmount(() => {
   unlistenTray?.()
   unlistenTrayHidden?.()
   unlistenClipboard?.()
+  unlistenClipboardImage?.()
   window.clearInterval(guardTimer)
   stopFullscreenWatch?.()
   disposeTheme?.()

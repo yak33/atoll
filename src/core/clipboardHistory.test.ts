@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_ITEMS,
   MAX_TEXT_LENGTH,
+  addClipboardImageItem,
   addClipboardItem,
   clearUnpinned,
   removeClipboardItem,
@@ -116,5 +117,51 @@ describe('searchClipboard / summarize', () => {
   it('摘要压平换行并截断加省略号', () => {
     expect(summarize('a\n  b\tc')).toBe('a b c')
     expect(summarize('x'.repeat(100), 80)).toBe(`${'x'.repeat(80)}…`)
+  })
+})
+
+describe('addClipboardImageItem', () => {
+  it('支持插入图片条目,保留宽高等元信息', () => {
+    const items = addClipboardImageItem(
+      [],
+      {
+        path: 'C:\\path\\clip_1.png',
+        dataUrl: 'data:image/png;base64,abc',
+        width: 1920,
+        height: 1080,
+      },
+      T0,
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0].kind).toBe('image')
+    expect(items[0].imagePath).toBe('C:\\path\\clip_1.png')
+    expect(items[0].width).toBe(1920)
+    expect(items[0].height).toBe(1080)
+    expect(items[0].text).toBe('[图片] 1920×1080')
+  })
+
+  it('相同图片路径去重并更新时间', () => {
+    let items = addClipboardImageItem(
+      [],
+      {
+        path: 'C:\\path\\clip_1.png',
+        dataUrl: 'data:image/png;base64,abc',
+        width: 800,
+        height: 600,
+      },
+      T0,
+    )
+    items = addClipboardImageItem(
+      items,
+      {
+        path: 'C:\\path\\clip_1.png',
+        dataUrl: 'data:image/png;base64,abc',
+        width: 800,
+        height: 600,
+      },
+      T0 + 5000,
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0].copiedAt).toBe(T0 + 5000)
   })
 })

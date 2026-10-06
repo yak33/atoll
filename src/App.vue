@@ -689,9 +689,10 @@ async function dockNow(): Promise<void> {
       height: monitor.workArea.size.height,
     }
     const edge = nearestEdge(winRect, workRect)
-    // 用户拍板:始终保持胶囊形态,不要方形小徽章;仅贴近屏幕顶部才折叠为上方 3px 霓虹横条
-    const topMarginPhysical = Math.round(24 * scaleFactor)
-    if (edge !== 'top' || winRect.y > workRect.y + topMarginPhysical) {
+    // 真正贴顶判定:胶囊必须紧挨屏幕顶边(误差 <= 4px 逻辑像素);
+    // 离顶边有间隙时视为用户有意悬浮,始终保持胶囊形态不折叠,不发生瞬移
+    const topAttachTolerance = Math.round(4 * scaleFactor)
+    if (edge !== 'top' || winRect.y > workRect.y + topAttachTolerance) {
       return
     }
 

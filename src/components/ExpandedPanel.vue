@@ -104,7 +104,10 @@ function urgentOf(iso: string | null): boolean {
     @mousemove="onPanelMouseMove"
     @mouseup="onPanelMouseUp"
   >
-    <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
+    <div class="tabs-row">
+      <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
+      <button class="gear-btn" type="button" title="设置" @click="emit('settings')">⚙</button>
+    </div>
 
     <div class="panel-header" title="按住任意位置拖动">
       <span class="plan">{{ planLevel || '未知套餐' }}</span>
@@ -144,7 +147,6 @@ function urgentOf(iso: string | null): boolean {
         <button class="action-btn" type="button" :disabled="refreshing" @click="emit('refresh')">
           {{ refreshing ? '刷新中…' : '刷新' }}
         </button>
-        <button class="action-btn" type="button" @click="emit('settings')">设置</button>
       </div>
     </div>
   </div>
@@ -394,5 +396,26 @@ function urgentOf(iso: string | null): boolean {
   .panel > * {
     animation: none !important;
   }
+}
+/* Tab 行 + 设置按钮(与其他模块面板一致) */
+.tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gear-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.gear-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-overlay);
 }
 </style>

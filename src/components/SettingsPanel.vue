@@ -11,6 +11,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   loadAppearance,
   loadDockFoldEnabled,
+  loadExpandDelayMs,
   loadTrayVisible,
   loadClipboardEnabled,
   loadPomodoro,
@@ -50,6 +51,7 @@ const emit = defineEmits<{
   clipboardEnabled: [enabled: boolean]
   clipboardClear: []
   dockFoldEnabled: [enabled: boolean]
+  expandDelayMs: [ms: number]
   trayVisible: [visible: boolean]
   quit: []
   resetPosition: []
@@ -211,6 +213,8 @@ const clipboardOn = ref(true)
 const trayVisibleOn = ref(true)
 // 贴顶自动折叠开关(默认开;关闭 = 永远保持完整胶囊)
 const dockFoldOn = ref(true)
+// 悬停展开延迟(ms):拖动实时生效
+const expandDelay = ref(250)
 
 function handleClipboardToggle(enabled: boolean): void {
   clipboardOn.value = enabled
@@ -238,6 +242,7 @@ onMounted(async () => {
   alerts.value = await loadUsageAlerts()
   clipboardOn.value = await loadClipboardEnabled()
   dockFoldOn.value = await loadDockFoldEnabled()
+  expandDelay.value = await loadExpandDelayMs()
   trayVisibleOn.value = await loadTrayVisible()
   try {
     autostartOn.value = await isEnabled()
@@ -515,6 +520,23 @@ onBeforeUnmount(() => {
       />
     </div>
 
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">悬停展开延迟</span>
+          <span class="slider-value">{{ expandDelay }} ms</span>
+        </div>
+        <input
+          v-model.number="expandDelay"
+          type="range"
+          class="slider"
+          min="50"
+          max="2000"
+          step="50"
+          @input="emit('expandDelayMs', expandDelay)"
+          @change="emit('expandDelayMs', expandDelay)"
+        />
+      </div>
+
     <div class="glow-header">
       <div class="slider-head" style="flex: 1">
         <span class="field-label">偶发光效</span>
@@ -630,32 +652,21 @@ onBeforeUnmount(() => {
   padding: 14px 16px 16px;
   user-select: none;
   overflow-y: auto;
-  transform-origin: top center;
-  animation: panel-spring-in 0.32s var(--ease-spring);
+  animation: panel-in 0.2s ease;
 }
 
 .panel:active {
   cursor: grabbing;
 }
 
-@keyframes panel-spring-in {
-  0% {
-    opacity: 0.15;
-    transform: translateY(-16px) scale(0.92, 0.4);
-    filter: blur(4px);
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
   }
-  65% {
+  to {
     opacity: 1;
-    transform: translateY(2px) scale(1.015, 1.02);
-    filter: blur(0);
-  }
-  85% {
-    transform: translateY(-0.5px) scale(0.998, 0.998);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1, 1);
-    filter: blur(0);
+    transform: translateY(0);
   }
 }
 

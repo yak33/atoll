@@ -169,43 +169,17 @@ function urgentOf(iso: string | null): boolean {
   font-size: 12px;
   user-select: none;
   cursor: grab;
-  transform-origin: top center;
-  animation: panel-spring-in 0.32s var(--ease-spring);
+  animation: panel-in 0.2s ease;
 }
 
 .panel:active {
   cursor: grabbing;
 }
 
-@keyframes panel-spring-in {
-  0% {
-    opacity: 0.15;
-    transform: translateY(-16px) scale(0.92, 0.4);
-    filter: blur(4px);
-  }
-  65% {
-    opacity: 1;
-    transform: translateY(2px) scale(1.015, 1.02);
-    filter: blur(0);
-  }
-  85% {
-    transform: translateY(-0.5px) scale(0.998, 0.998);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1, 1);
-    filter: blur(0);
-  }
-}
-
-.panel > * {
-  animation: panel-content-fade 0.22s ease-out;
-}
-
-@keyframes panel-content-fade {
+@keyframes panel-in {
   from {
-    opacity: 0.3;
-    transform: translateY(4px);
+    opacity: 0;
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;

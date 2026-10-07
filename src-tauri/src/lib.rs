@@ -337,11 +337,12 @@ pub fn run() {
             clipboard_watch::start(app.handle().clone());
             // 托盘:显示/隐藏 + 隐藏托盘 + 关于 + 退出。窗口可见性事件发给前端统一管理,
             // 避免 Rust/JS 两边同时改窗口可见性互相打架。
+            let settings = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
             let toggle = MenuItem::with_id(app, "toggle", "显示 / 隐藏", true, None::<&str>)?;
             let hide_tray = MenuItem::with_id(app, "hide-tray", "隐藏托盘图标", true, None::<&str>)?;
             let about = MenuItem::with_id(app, "about", "关于 atoll", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle, &hide_tray, &about, &quit])?;
+            let menu = Menu::with_items(app, &[&settings, &toggle, &hide_tray, &about, &quit])?;
 
             TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().expect("未配置窗口图标").clone())
@@ -349,6 +350,11 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
+                    "settings" => {
+                        if let Some(window) = app.get_webview_window("island") {
+                            let _ = window.emit("tray:open-settings", ());
+                        }
+                    }
                     "toggle" => {
                         if let Some(window) = app.get_webview_window("island") {
                             let _ = window.emit("tray:toggle-visibility", ());

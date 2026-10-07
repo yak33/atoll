@@ -312,6 +312,26 @@ export async function saveTrayVisible(value: boolean): Promise<void> {
   await store.save()
 }
 
+/** 悬停展开延迟(ms):鼠标停留多久后展开面板;默认 250(轻划掠过不误触) */
+export async function loadExpandDelayMs(): Promise<number> {
+  try {
+    const store = await getStore()
+    const value = await store.get<number>('expand_delay_ms')
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.min(2000, Math.max(50, Math.round(value)))
+    }
+  } catch {
+    // 读取失败回落默认
+  }
+  return 250
+}
+
+export async function saveExpandDelayMs(value: number): Promise<void> {
+  const store = await getStore()
+  await store.set('expand_delay_ms', Math.min(2000, Math.max(50, Math.round(value))))
+  await store.save()
+}
+
 /** 剪贴板历史读写:结构与淘汰规则见 core/clipboardHistory.ts */
 export async function loadClipboardHistory(): Promise<ClipboardItem[]> {
   try {

@@ -24,6 +24,7 @@ import {
   loadCredential,
   loadDockFoldEnabled,
   loadTrayVisible,
+  loadExpandDelayMs,
   loadPillPosition,
   loadPomodoro,
   loadTheme,
@@ -35,6 +36,7 @@ import {
   saveCredential,
   saveDockFoldEnabled,
   saveTrayVisible,
+  saveExpandDelayMs,
   savePillPosition,
   saveUsageHistory,
   type AppearanceSettings,
@@ -284,6 +286,7 @@ let collapseTimer: number | null = null
 const manualHidden = ref(false)
 let unlistenTray: (() => void) | null = null
 let unlistenTrayHidden: (() => void) | null = null
+let unlistenTraySettings: (() => void) | null = null
 let stopFullscreenWatch: (() => void) | null = null
 let disposeTheme: (() => void) | null = null
 let unlistenFocus: (() => void) | null = null
@@ -377,6 +380,16 @@ async function handleDockFoldEnabled(next: boolean): Promise<void> {
   }
 }
 
+/** 悬停展开延迟设置:拖动实时生效,松手落盘 */
+async function handleExpandDelayMs(next: number): Promise<void> {
+  expandDelayMs.value = next
+  try {
+    await saveExpandDelayMs(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
 /** 托盘图标显示开关:设置面板入口(托盘菜单「隐藏托盘图标」的事件也会走到这里同步落盘) */
 async function handleTrayVisible(next: boolean): Promise<void> {
   await setTrayVisible(next)
@@ -447,6 +460,7 @@ onMounted(async () => {
   clipboardItems.value = await loadClipboardHistory()
   clipboardEnabled.value = await loadClipboardEnabled()
   dockFoldEnabled.value = await loadDockFoldEnabled()
+  expandDelayMs.value = await loadExpandDelayMs()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -465,6 +479,11 @@ onMounted(async () => {
   // 托盘菜单「隐藏托盘图标」:同步设置面板状态并落盘
   unlistenTrayHidden = await listen('tray:hidden', () => {
     void saveTrayVisible(false)
+  })
+
+  // 托盘菜单「设置」:胶囊点击不再进设置后的全局兜底入口
+  unlistenTraySettings = await listen('tray:open-settings', () => {
+    void openSettings()
   })
 
   // 剪贴板文本变化(Rust watcher 事件驱动);防抖落盘
@@ -537,6 +556,7 @@ onBeforeUnmount(() => {
   poller.stop()
   unlistenTray?.()
   unlistenTrayHidden?.()
+  unlistenTraySettings?.()
   unlistenClipboard?.()
   unlistenClipboardImage?.()
   window.clearInterval(guardTimer)
@@ -574,8 +594,8 @@ async function enterMode(target: IslandMode): Promise<void> {
   }
 }
 
-/** 鼠标在药丸上停留超过该延迟才展开,防止轻划掠过或滚轮切模块时误触展开 (调至 1000ms) */
-const EXPAND_DELAY_MS = 1000
+/** 悬停展开延迟(ms),设置面板可配;默认 250 防轻划误触 */
+const expandDelayMs = ref(250)
 let expandTimer: number | null = null
 
 function scheduleExpand(): void {
@@ -584,7 +604,7 @@ function scheduleExpand(): void {
   expandTimer = window.setTimeout(() => {
     expandTimer = null
     void enterMode('expanded')
-  }, EXPAND_DELAY_MS)
+  }, expandDelayMs.value)
 }
 
 function cancelExpand(): void {
@@ -667,12 +687,13 @@ function handlePillMouseUp(): void {
 }
 
 async function handlePillClick(): Promise<void> {
-  // 若刚才发生了拖拽位移,松手不触发点击打开设置
+  // 若刚才发生了拖拽位移,松手不触发点击
   if (pillDragMoved) {
     pillDragMoved = false
     return
   }
-  await openSettings()
+  // 点击 = 立即展开(不等悬停延迟);设置入口在各面板与托盘菜单
+  await enterMode('expanded')
 }
 
 function handlePillHover(): void {
@@ -1074,10 +1095,11 @@ const panelProps = computed<Record<string, unknown>>(() => {
 /** 模块特有事件;mouseenter/mouseleave/dragstart/switchModule 四个契约事件静态绑在模板上 */
 const panelEvents = computed<Record<string, unknown>>(() => {
   if (activeModule.value === 'pomodoro') {
-    return { pomoToggle: handlePomoToggle, pomoReset: handlePomoReset }
+    return { settings: openSettings, pomoToggle: handlePomoToggle, pomoReset: handlePomoReset }
   }
   if (activeModule.value === 'clipboard') {
     return {
+      settings: openSettings,
       copy: handleClipboardCopy,
       remove: handleClipboardRemove,
       pin: handleClipboardPin,
@@ -1142,6 +1164,7 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @usage-alerts="handleUsageAlerts"
     @clipboard-enabled="handleClipboardEnabled"
     @dock-fold-enabled="handleDockFoldEnabled"
+    @expand-delay-ms="handleExpandDelayMs"
     @tray-visible="handleTrayVisible"
     @quit="quitApp"
     @clipboard-clear="handleClipboardClearAll"
@@ -1363,14 +1386,13 @@ html[data-theme='light'][data-skin='cyber'] {
   transition:
     background 0.3s var(--ease-spring-soft),
     border-color 0.25s ease,
-    transform 0.26s var(--ease-spring),
+    transform 0.18s var(--ease-spring),
     box-shadow 0.25s ease;
 }
 
 .island:hover {
-  transform: scale(1.025);
   border-color: var(--pill-border-hover);
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.14), var(--pill-shadow-hover);
+  box-shadow: var(--pill-shadow-hover);
 }
 
 .island:active {

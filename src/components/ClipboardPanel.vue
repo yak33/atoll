@@ -27,6 +27,7 @@ const emit = defineEmits<{
   pin: [id: string]
   clear: []
   switchModule: [module: IslandModule]
+  settings: []
 }>()
 
 const keyword = ref('')
@@ -166,7 +167,10 @@ function onPanelMouseUp(): void {
     @mousemove="onPanelMouseMove"
     @mouseup="onPanelMouseUp"
   >
-    <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
+    <div class="tabs-row">
+      <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
+      <button class="gear-btn" type="button" title="设置" @click="emit('settings')">⚙</button>
+    </div>
 
     <div class="search-box">
       <input
@@ -272,43 +276,17 @@ function onPanelMouseUp(): void {
   font-size: 12px;
   user-select: none;
   cursor: grab;
-  transform-origin: top center;
-  animation: panel-spring-in 0.32s var(--ease-spring);
+  animation: panel-in 0.2s ease;
 }
 
 .panel:active {
   cursor: grabbing;
 }
 
-@keyframes panel-spring-in {
-  0% {
-    opacity: 0.15;
-    transform: translateY(-16px) scale(0.92, 0.4);
-    filter: blur(4px);
-  }
-  65% {
-    opacity: 1;
-    transform: translateY(2px) scale(1.015, 1.02);
-    filter: blur(0);
-  }
-  85% {
-    transform: translateY(-0.5px) scale(0.998, 0.998);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1, 1);
-    filter: blur(0);
-  }
-}
-
-.panel > * {
-  animation: panel-content-fade 0.22s ease-out;
-}
-
-@keyframes panel-content-fade {
+@keyframes panel-in {
   from {
-    opacity: 0.3;
-    transform: translateY(4px);
+    opacity: 0;
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
@@ -626,5 +604,26 @@ function onPanelMouseUp(): void {
   .panel > * {
     animation: none !important;
   }
+}
+/* Tab 行 + 设置按钮 */
+.tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gear-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.gear-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-overlay);
 }
 </style>

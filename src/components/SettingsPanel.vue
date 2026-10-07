@@ -630,11 +630,33 @@ onBeforeUnmount(() => {
   padding: 14px 16px 16px;
   user-select: none;
   overflow-y: auto;
-  cursor: grab;
+  transform-origin: top center;
+  animation: panel-spring-in 0.32s var(--ease-spring);
 }
 
 .panel:active {
   cursor: grabbing;
+}
+
+@keyframes panel-spring-in {
+  0% {
+    opacity: 0.15;
+    transform: translateY(-16px) scale(0.92, 0.4);
+    filter: blur(4px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(2px) scale(1.015, 1.02);
+    filter: blur(0);
+  }
+  85% {
+    transform: translateY(-0.5px) scale(0.998, 0.998);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1, 1);
+    filter: blur(0);
+  }
 }
 
 /* 可交互元素保持自己的光标语义 */
@@ -960,5 +982,13 @@ onBeforeUnmount(() => {
   font-size: 10px;
   color: var(--text-muted);
   text-align: right;
+}
+
+/* 尊重系统「减少动态效果」:面板弹簧入场退化为直接显示 */
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .panel > * {
+    animation: none !important;
+  }
 }
 </style>

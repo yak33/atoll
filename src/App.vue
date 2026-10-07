@@ -574,8 +574,8 @@ async function enterMode(target: IslandMode): Promise<void> {
   }
 }
 
-/** 鼠标在药丸上停留超过该延迟才展开,防止轻划掠过或滚轮切模块时误触展开 */
-const EXPAND_DELAY_MS = 250
+/** 鼠标在药丸上停留超过该延迟才展开,防止轻划掠过或滚轮切模块时误触展开 (调至 1000ms) */
+const EXPAND_DELAY_MS = 1000
 let expandTimer: number | null = null
 
 function scheduleExpand(): void {
@@ -1363,13 +1363,14 @@ html[data-theme='light'][data-skin='cyber'] {
   transition:
     background 0.3s var(--ease-spring-soft),
     border-color 0.25s ease,
-    transform 0.18s var(--ease-spring),
+    transform 0.26s var(--ease-spring),
     box-shadow 0.25s ease;
 }
 
 .island:hover {
+  transform: scale(1.025);
   border-color: var(--pill-border-hover);
-  box-shadow: var(--pill-shadow-hover);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.14), var(--pill-shadow-hover);
 }
 
 .island:active {

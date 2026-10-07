@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "atoll"
-version = "0.2.24"
+version = "0.2.25"
 dependencies = [
  "clipboard-rs",
  "serde",

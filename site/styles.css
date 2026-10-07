@@ -1089,3 +1089,11 @@ html.js .states-demo .reveal:nth-child(3) { transition-delay: 0.16s; }
 }
 .clip-time { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
 .clip-foot { font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 2px; }
+
+/* mock 面板顶部齿轮(与真实产品 ⚙ 一致) */
+.mock-gear {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: default;
+}

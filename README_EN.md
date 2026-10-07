@@ -8,7 +8,7 @@
 
 Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipboard History · Extensible Multi-Module Island Container
 
-[![Version](https://img.shields.io/badge/version-v0.2.23-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.25-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -16,7 +16,7 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
 
 [English](./README_EN.md) &nbsp;|&nbsp; [简体中文](./README.md)
 
-[🌐 Official Website](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ Download Latest Release (v0.2.23)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 Release Notes](https://github.com/yak33/atoll/releases)
+[🌐 Official Website](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ Download Latest Release (v0.2.25)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 Release Notes](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -72,7 +72,7 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
   - Right-click tray menu provides Show/Hide, Hide Tray Icon (recoverable in Settings), About, and Exit.
 - **Free Dragging & Coordinate Memory**: Grab and reposition both the capsule pill and expanded panel directly; positions are persisted and restored across reboots.
 - **Silky Interactions & Spring Motion**: 
-  - Hovering for 1 second triggers a physical spring expansion animation (`panel-spring-in`), morphing from capsule to panel with jelly-like overshoot and smooth content fade;
+  - Hover (250ms by default, configurable 50–2000ms in settings) expands the panel with hover-intent protection against accidental swipes; clicking the pill expands instantly;
   - Wheel scrolling over top tabs or capsule cycles between functional modules;
   - Wheel scrolling inside clipboard history or preview cards seamlessly scrolls content without accidental module switching;
 - **Tactile Sound Effects**: Synthesized crisp drop sounds via frontend Web Audio upon Pomodoro phase completion, window quota resets, and clipboard copies (zero external audio assets).
@@ -82,14 +82,14 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
 ## 🖥️ Three-State Architecture
 
 ```
-[ Pill 260×44 ] ──( Hover 1s / Click Settings )──> [ Expanded Panel ] ──( Click Settings )──> [ Settings Panel 340×700 ]
+[ Pill 260×44 ] ──( Hover / Click to Expand )──> [ Expanded Panel ] ──( Top ⚙ )──> [ Settings Panel 340×700 ]
   5h [■■■□] 44% 2h15m                              Full Data + 24h Trend + Controls             Modular Settings
 ```
 
 | State | Size (Logical px) | Purpose & Interaction |
 | :--- | :--- | :--- |
 | **Pill (Collapsed)** | `260 × 44` (Customizable width) | Stays pinned to screen top edge; displays most urgent quota window or Pomodoro countdown; mouse wheel cycles modules |
-| **Expanded Panel** | Usage `400+ × 265` / Pomodoro `280 × 250` / Clipboard `320 × 380` | Hover for 1s to trigger spring expansion; inspects full progress bars, sparklines, forecast, clipboard history & preview; mouse wheel scrolls lists natively |
+| **Expanded Panel** | Usage `400+ × 265` / Pomodoro `280 × 250` / Clipboard `320 × 380` | Hover or click to expand; inspects full progress bars, sparklines, forecast, clipboard history & preview; mouse wheel scrolls lists natively; top-right ⚙ opens settings |
 | **Settings Panel** | `340 × 700` | Click to open settings; modular configuration for API Key, alert thresholds, Pomodoro durations, skins, sheens, and autostart |
 
 ---
@@ -97,9 +97,9 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
 ## 🚀 Quick Start
 
 ### Method 1: Download Installer (Recommended)
-1. Go to the [Releases Page](https://github.com/yak33/atoll/releases/latest) and download `atoll_0.2.23_x64-setup.exe`;
+1. Go to the [Releases Page](https://github.com/yak33/atoll/releases/latest) and download `atoll_0.2.25_x64-setup.exe`;
 2. Double-click to install (installs to user local directory, **no administrator privileges required**);
-3. Launch atoll, click the top pill capsule, and paste your Zhipu API Key under Usage Settings (enter Organization ID as well if using a Team plan).
+3. Launch atoll, hover the top pill to expand, click the ⚙ (top-right) to open settings, then paste your Zhipu API Key under the Usage tab (enter Organization ID as well if using a Team plan).
 
 > 🔒 **Privacy Guarantee**: atoll is a client-only desktop application with zero backend. Your API Key and clipboard history are stored exclusively on your local machine in plaintext JSON. Besides direct requests to Zhipu's official quota endpoint, no data is ever transmitted to any third-party server.
 
@@ -137,7 +137,7 @@ atoll/
 - **Official Protocol Compliance**: Sends bare API Keys directly in compliance with Zhipu's authentication specs (without `Bearer` prefix).
 - **Resource Efficiency**:
   - Polling interval fixed at 5 minutes + random jitter with 1→10 min exponential backoff;
-  - Lightweight installer footprint at **~3.07 MiB**;
+  - Lightweight installer footprint at **~3.08 MiB**;
   - Idle memory consumption around **~138 MB** (mostly Windows WebView2 base runtime, Tauri core host is only ~30 MB);
   - **81 automated unit tests pass 100%**.
 

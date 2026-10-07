@@ -8,7 +8,7 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.23-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.25-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -16,7 +16,7 @@
 
 [English](./README_EN.md) &nbsp;|&nbsp; [简体中文](./README.md)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.23)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.25)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -71,7 +71,7 @@
   - 鼠标悬停右下角托盘图标即可看实时状态：`atoll · 5h: 24% | 7d: 45%` 或 `atoll · 🍅 专注 22:15`；
   - 托盘右键菜单:显示/隐藏、隐藏托盘图标(设置中可恢复)、关于(版本/作者/链接)、退出。
 - **自由拖拽与记忆**：收起态药丸与展开面板均可直接按住拖动，窗口位置保存在本地，下次启动原位恢复。
-- **丝滑交互反馈**：收起态与展开态均可鼠标滚轮上下滑动平滑切屏切换模块；悬停 1 秒（hover intent）配合物理弹簧形变（panel-spring-in）优雅展开完整面板，轻划掠过不误触，离开半秒防误触收回。
+- **丝滑交互反馈**：收起态与展开态均可鼠标滚轮上下滑动平滑切屏切换模块；悬停（默认 250ms，设置中可调 50~2000ms）延迟展开防轻划误触，点击药丸立即展开；离开半秒防误触收回。
 - **状态音效**：番茄阶段切换、额度窗口重置、复制成功时轻响一声，Web Audio 合成零音频文件。
 
 ---
@@ -79,14 +79,14 @@
 ## 🖥️ 三态形态设计
 
 ```
-[ 收起态 260×44 ] ──( 悬停 1s / 点击设置 )──> [ 展开态 ] ──( 点击设置 )──> [ 设置态 340×700 ]
+[ 收起态 260×44 ] ──( 悬停 / 点击展开 )──> [ 展开态 ] ──( 顶部 ⚙ )──> [ 设置态 340×700 ]
   5h [■■■□] 44% 2h15m                           完整数据 + 24h 趋势 + 刷新          按模块分区配置
 ```
 
 | 状态 | 尺寸 (逻辑像素) | 行为与用途 |
 | :--- | :--- | :--- |
-| **收起态 (Pill)** | `260 × 44` (宽度可自定义) | 常驻屏幕顶部，展示当前最紧张窗口或番茄钟状态。鼠标滚轮上下推拉切模块 |
-| **展开态 (Expanded)** | 用量 `400+ × 265` / 番茄 `280 × 250` / 剪贴 `320 × 380` | 悬停 1s 触发物理弹簧展开完整进度条、24h 趋势折线、速率预测、剪贴板搜索或番茄控制；列表支持原生平滑滚动 |
+| **收起态 (Pill)** | `260 × 44` (宽度可自定义) | 常驻屏幕顶部，展示当前最紧张窗口或番茄钟状态。滚轮切模块；悬停或点击展开 |
+| **展开态 (Expanded)** | 用量 `400+ × 265` / 番茄 `280 × 250` / 剪贴 `320 × 380` | 悬停或点击展开：完整进度条、24h 趋势折线、速率预测、剪贴板搜索或番茄控制；列表支持原生平滑滚动；顶部 ⚙ 进入设置 |
 | **设置态 (Settings)** | `340 × 700` | 点击打开设置面板，按模块分区配置 API Key、告警阈值、番茄时长、主题皮肤、光效、开机自启 |
 
 ---
@@ -94,9 +94,9 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.23_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.25_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
-3. 打开后点击顶部药丸胶囊，在用量设置中粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
+3. 打开后悬停顶部药丸展开面板，点右上角 ⚙ 进入设置，在用量页粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
 > 🔒 **隐私声明**：atoll 是零后端的纯桌面应用，您的 API Key 仅存储在本机应用数据目录（明文 JSON，无加密），除直连智谱官方额度接口外，绝不向任何第三方服务器上传任何数据。
 
@@ -134,7 +134,7 @@ atoll/
 - **安全鉴权**：遵循智谱官方协议直接发送裸 API Key（不加 `Bearer` 前缀）。
 - **绿色低耗**：
   - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
-  - 安装包大小仅 **~3.07 MiB**；
+  - 安装包大小仅 **~3.08 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
   - **81 个单元测试全部自动化通过**。
 

@@ -8,13 +8,13 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.22-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.2.23-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-zinc?style=flat-square)](LICENSE)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.22)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.23)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -92,7 +92,7 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.22_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.23_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后点击顶部药丸胶囊，在用量设置中粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
@@ -132,7 +132,7 @@ atoll/
 - **安全鉴权**：遵循智谱官方协议直接发送裸 API Key（不加 `Bearer` 前缀）。
 - **绿色低耗**：
   - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
-  - 安装包大小仅 **~3.08 MiB**；
+  - 安装包大小仅 **~3.07 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
   - **78 个单元测试全部自动化通过**。
 

@@ -8,7 +8,7 @@
 
 Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipboard History · Extensible Multi-Module Island Container
 
-[![Version](https://img.shields.io/badge/version-v0.2.25-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.3.0-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -16,7 +16,7 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
 
 [English](./README_EN.md) &nbsp;|&nbsp; [简体中文](./README.md)
 
-[🌐 Official Website](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ Download Latest Release (v0.2.25)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 Release Notes](https://github.com/yak33/atoll/releases)
+[🌐 Official Website](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ Download Latest Release (v0.3.0)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 Release Notes](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -29,6 +29,7 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
 
 **atoll** is a modern, Apple-inspired "Dynamic Island" floating widget tailored specifically for Windows 10 & 11. Most of the time, it rests as a discreet 260 × 44px capsule pinned to the top edge of your primary screen:
 - **Glanceable quota consumption**: Say goodbye to browser tabs just to check your API usage. Rolling consumption windows, countdowns, and quota alerts are always visible at a glance.
+- **AI Agent activity at a glance**: Know whether ZCode / Claude Code is working, waiting for your confirmation, or done — via the pill status dot and in-island bubble notices.
 - **Strictly non-intrusive**: No taskbar footprint, zero focus stealing, millisecond-fast auto-hide during full-screen games/movies, and seamless drag-and-drop placement with persistent coordinates.
 
 ---
@@ -47,23 +48,30 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
   - 🔔 **Window Reset Alerts**: Native Windows Toast notification fires automatically whenever a usage window resets.
 - **Universal Compatibility**: Supports both Personal and Team plans (configurable `organizationId` and `projectId`); handles Token limit and Credit limit billing modes seamlessly.
 
-### 2. Pomodoro Focus Timer
+### 2. AI Agent Activity Monitor (merged into the Usage module)
+- **Pill Status Dot**: Whenever an agent is working / awaiting your confirmation / erroring, a status dot lights up at the right end of the usage pill — cyan breathing while working, amber bouncing while waiting, steady red on errors. Perceivable from the corner of your eye without interrupting your flow.
+- **Panel Activity Strip**: The expanded panel lists every agent's live status (icon, name, state, last update) with waiting items pinned first; entries clean themselves up automatically by lifecycle (completed after 5 min, errors after 30 min) — no manual maintenance.
+- **In-Island Bubble Notices**: When an agent awaits confirmation or finishes a task, a bubble drops from beneath the pill and auto-retracts in ~4 seconds; hover to pause the countdown, click to jump straight to the details, and queued messages display in sequence. Falls back to native Windows notifications whenever the island is hidden or edge-docked; the notification mode (bubble / system / both) is configurable in settings.
+- **Companion Plugin Ecosystem**: The repo ships companion plugins for ZCode and Claude Code (one-click install from a local plugin marketplace, zero configuration). Agents report their status through a loopback-only HTTP bridge (`127.0.0.1:41799`, machine-local, no CORS): ZCode uses a `process`-type hook invoking `curl.exe`, while Claude Code uses a native `http`-type hook — sidestepping Windows shell quoting entirely.
+- **Broken-Stream Self-Healing**: If hooks die or an agent crashes, a "working" state older than 10 minutes degrades to "Unknown" instead of pretending to work forever; a stuck "waiting" state degrades after 60 minutes to prevent eternal pulsing.
+
+### 3. Pomodoro Focus Timer
 - **Sleep/Wake Immune State Machine**: Timestamp-based countdown calculations survive system sleep and hibernation without time drift or runaway countdowns.
 - **Dual Phase Flow**: Automatic alternation between Focus and Break phases with Windows desktop toast alerts and subtle pulsing heartbeat animations while running.
 - **Adjust on the Fly**: Slider controls for Work (5–60 min) and Break (1–30 min) durations, taking effect immediately upon the next phase transition.
 
-### 3. Smart Clipboard History Module
+### 4. Smart Clipboard History Module
 - **Event-Driven Listening**: Utilizes Win32 `AddClipboardFormatListener` (via `clipboard-rs`) for zero-polling instant capture; supports plain text and images (screenshots/copied images automatically saved locally with thumbnail generation, hover full-size preview, and one-click write-back to system clipboard).
 - **De-duplication & Pinning**: Duplicated copies refresh timestamps and move to the top without redundant records; holds up to 200 items with pinned items protected from eviction.
 - **Instant Search & Write-back**: Substring keyword filtering with robust IME composition and focus protection; one-click write-back directly into Windows clipboard for effortless `Ctrl + V` pasting across apps.
 - **100% Local & Private**: Never uploads or communicates with external servers; toggle recording off or purge history anytime in settings.
 
-### 4. 6 Curated Skins & 11 Ambient Sheen Flows
+### 5. 6 Curated Skins & 11 Ambient Sheen Flows
 - **6 Handcrafted Themes**: Obsidian (Emerald), Deep Sea (Cyber Ice Blue), Aurora (Midnight Violet), Flame (Sunset Orange), Mint (Fresh Pine), and Titanium (Matte Dark Gold), synchronized across pill capsules, highlights, and panels.
 - **11 Ambient Sheen Effects**: Border Flow, Comet Tail, Dual Sheen, Particle Collider, Wave Ripple, Dual Wave, Sonar Pulse, Aurora Dispersion, Eclipse Gold, Diagonal Sweep, and Starlight Sparkle, bringing subtle life to your desktop.
 - **Seamless Light/Dark Adaptation**: Full support for Light, Dark, or automatic synchronization with Windows system theme.
 
-### 5. Thoughtful, Non-Intrusive Desktop Experience
+### 6. Thoughtful, Non-Intrusive Desktop Experience
 - **Fullscreen Auto-Hide**: Detects foreground fullscreen applications (games, video players, presentations) and hides instantaneously, restoring smoothly upon exit.
 - **Top-Edge Auto-Docking**: When docked against the top screen edge and untouched for 3 seconds, folds automatically into an ultra-thin 3px neon ambient accent line; restores into full capsule on mouse hover (can be toggled in settings).
 - **Screen Boundary Safety Net**: Never lose your window off-screen; dragging off-boundary automatically bounces back into full visibility on mouse release.
@@ -97,7 +105,7 @@ Zhipu GLM Coding Plan Quota Monitor · Minimalist Pomodoro Timer · Smart Clipbo
 ## 🚀 Quick Start
 
 ### Method 1: Download Installer (Recommended)
-1. Go to the [Releases Page](https://github.com/yak33/atoll/releases/latest) and download `atoll_0.2.25_x64-setup.exe`;
+1. Go to the [Releases Page](https://github.com/yak33/atoll/releases/latest) and download `atoll_0.3.0_x64-setup.exe`;
 2. Double-click to install (installs to user local directory, **no administrator privileges required**);
 3. Launch atoll, hover the top pill to expand, click the ⚙ (top-right) to open settings, then paste your Zhipu API Key under the Usage tab (enter Organization ID as well if using a Team plan).
 
@@ -139,7 +147,7 @@ atoll/
   - Polling interval fixed at 5 minutes + random jitter with 1→10 min exponential backoff;
   - Lightweight installer footprint at **~3.08 MiB**;
   - Idle memory consumption around **~138 MB** (mostly Windows WebView2 base runtime, Tauri core host is only ~30 MB);
-  - **81 automated unit tests pass 100%**.
+  - **89 automated unit tests pass 100%**.
 
 ---
 

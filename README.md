@@ -8,7 +8,7 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.2.25-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.3.0-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -16,7 +16,7 @@
 
 [English](./README_EN.md) &nbsp;|&nbsp; [简体中文](./README.md)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.2.25)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.3.0)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -29,6 +29,7 @@
 
 **atoll** 是一款专为 Windows 桌面打造的现代「灵动岛」悬浮组件。平时只是一颗 260 × 44 像素的极简胶囊，钉在屏幕顶部边缘：
 - **额度还剩多少，瞟一眼就知道**：告别频繁切网页查额度，滚动窗口、倒计时与限额告警尽收眼底。
+- **Agent 干活它在盯**：ZCode / Claude Code 在执行、在等你确认还是干完了，药丸状态点与岛内气泡一目了然。
 - **克制且不打扰**：不占任务栏、不抢焦点、全屏游戏与视频毫秒级隐身、拖到哪就停在哪。
 
 ---
@@ -47,23 +48,30 @@
   - 🔔 **重置提醒**：额度窗口一旦重置，自动发送 Windows Toast 通知。
 - **全场景支持**：适配个人版与团队版（支持配置 `organizationId` 与 `projectId`）；兼容 Token 限额模式与信用额度模式。
 
-### 2. 番茄钟专注模块
+### 2. AI Agent 工作状态监控（并入用量模块）
+- **药丸状态点**：任一 Agent 在执行 / 等你确认 / 异常时，用量药丸右端亮起状态点——执行中青蓝呼吸、等待确认琥珀跳动、异常红色常亮，余光可感知且不打断当前工作。
+- **面板活跃区**：展开面板顶部实时列出各 Agent 状态（图标、名称、状态、最近更新），等待确认优先置顶；条目按生命周期自动清理（完成 5 分钟、异常 30 分钟自动消失），无需手动维护。
+- **岛内气泡通知**：Agent 等待确认 / 任务完成时，气泡从药丸下方垂落，约 4 秒自动收回；悬停暂停倒计时，点击直达对应面板；多条消息自动排队。岛被隐藏或贴顶折叠时自动回退 Windows 系统通知，通知方式（岛内气泡 / 系统通知 / 两者）在设置中三选一。
+- **伴生插件生态**：仓库 `plugins/` 内置 ZCode 与 Claude Code 伴生插件（本地插件市场一键安装，零配置）。Agent 通过本地回环 HTTP 桥（`127.0.0.1:41799`，仅本机可达、无 CORS）实时上报工作状态；ZCode 用 `process` 型 hook 调 `curl.exe`，Claude Code 用原生 `http` 型 hook 宿主直发，全程绕开 shell 引号转义。
+- **断流自愈**：hook 丢失或 Agent 崩溃时，执行中状态超过 10 分钟自动降级为「状态不明」，不会永远假装在工作；等待确认超过 60 分钟降级处理，防止永久跳动。
+
+### 3. 番茄钟专注模块
 - **防休眠跑偏**：基于结束时间戳的精确状态机，系统睡眠唤醒自动冻结并暂停，时间绝不累加跑偏。
 - **双阶段流转**：专注与休息自动切换，阶段完成桌面 Toast 提醒；番茄钟运行中微弱心跳呼吸律动。
 - **随时调节**：工作时长（5~60 分钟）与休息时长自由滑杆配置，下一阶段即时生效。
 
-### 3. 剪贴板历史模块
+### 4. 剪贴板历史模块
 - **事件驱动记录**:Win32 `AddClipboardFormatListener` 消息监听(clipboard-rs),零轮询;支持纯文本与图像(截图/复制图片自动入库,缩略图+悬停预览+点击写回),文件类忽略。
 - **去重置顶**：重复复制同内容不产生冗余条目，原条目自动回到顶部；上限 200 条，置顶条目豁免淘汰。
 - **搜索与一键复制**：即时子串搜索，点击条目复制回剪贴板；支持置顶、删除、清空。
 - **数据只在本机**：不联网不上传；设置中可一键关闭记录或清空历史。
 
-### 4. 6 款调优质感皮肤与 11 种偶发流光
+### 5. 6 款调优质感皮肤与 11 种偶发流光
 - **6 套质感皮肤**：黑曜石（经典翠绿）、深海蓝（科技冰蓝）、极光紫（暗夜霓虹）、赤焰橙（暖意落日）、薄荷绿（清爽森系）、钛金金（哑黑钛金），底壳色调、高光游标与设置面板全局联动。
 - **11 种偶发物理流光**：边框流光、彗星拖尾、双流光、粒子对撞、波纹扩散、双波汇流、声呐涟漪、极光色散、月食金边、斜向扫光、星火微闪，让桌面充满生命力。
 - **深浅自适应**：浅色、深色、跟随 Windows 系统无缝自动切换。
 
-### 5. 极致克制的不打扰体验
+### 6. 极致克制的不打扰体验
 - **全屏自动隐藏**：检测到前台窗口全屏（游戏、全屏看片、PPT 演示投屏）灵动岛瞬时隐身，退出全屏自动恢复。
 - **贴顶自动折叠**（默认开，可在设置关闭）：药丸贴住屏幕顶边且静止 3 秒后，隐入为顶边一道 3px 霓虹流光线，移入即恢复完整胶囊；离顶边有间隙则视为有意悬浮，永不折叠。
 - **窗口永不丢失**：拖出屏幕多少都自动弹回完整可见（松手/鼠标离开即触发）；位置记忆带启动安全网。
@@ -86,7 +94,7 @@
 | 状态 | 尺寸 (逻辑像素) | 行为与用途 |
 | :--- | :--- | :--- |
 | **收起态 (Pill)** | `260 × 44` (宽度可自定义) | 常驻屏幕顶部，展示当前最紧张窗口或番茄钟状态。滚轮切模块；悬停或点击展开 |
-| **展开态 (Expanded)** | 用量 `400+ × 265` / 番茄 `280 × 250` / 剪贴 `320 × 380` | 悬停或点击展开：完整进度条、24h 趋势折线、速率预测、剪贴板搜索或番茄控制；列表支持原生平滑滚动；顶部 ⚙ 进入设置 |
+| **展开态 (Expanded)** | 用量 `400+ × 265`（Agent 活跃时自动加高）/ 番茄 `280 × 250` / 剪贴 `320 × 380` | 悬停或点击展开：完整进度条、24h 趋势折线、速率预测、Agent 活跃区、剪贴板搜索或番茄控制；列表支持原生平滑滚动；顶部 ⚙ 进入设置 |
 | **设置态 (Settings)** | `340 × 700` | 点击打开设置面板，按模块分区配置 API Key、告警阈值、番茄时长、主题皮肤、光效、开机自启 |
 
 ---
@@ -94,7 +102,7 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.2.25_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.3.0_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后悬停顶部药丸展开面板，点右上角 ⚙ 进入设置，在用量页粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
@@ -119,13 +127,17 @@ atoll/
 │   │   ├── windowLayout.ts      # 窗口多状态物理尺寸计算与高分屏缩放适配
 │   │   ├── fullscreenWatch.ts   # Rust 前台窗口探测驱动的全屏自动隐藏
 │   │   ├── clipboardHistory.ts  # 剪贴板历史: 去重置顶/上限淘汰/搜索
+│   │   ├── agentHub.ts          # Agent 状态模型: 优先级仲裁/生命周期清扫/事件归一化
+│   │   ├── notifyQueue.ts       # 岛内气泡通知队列: 去重/上限/保质期(纯函数)
+│   │   ├── notify.ts            # Windows toast 封装(权限被拒静默跳过)
 │   │   ├── edgeDock.ts          # 贴边折叠: 方向判定与物理/高分屏矩形计算
 │   │   └── sound.ts             # 离线微音效: Web Audio 纯前端合成双音水滴声
 │   ├── composables/     # useGlowEffects(偶发流光触发器) / nowTick(应用时钟)
-│   ├── components/      # 各模块 Pill/Panel 组件对 + MiniIsland + ModuleTabs + SettingsPanel
+│   ├── components/      # 各模块 Pill/Panel 组件对 + MiniIsland + NoticeBubble + ModuleTabs + SettingsPanel
 │   ├── islandModules.ts # 模块注册表: 挂载/滚轮环形切换/尺寸/Tab 全由它驱动
 │   └── App.vue          # 三态状态机、全局 CSS 变量、偶发流光系统与切屏容器
-├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 剪贴板监听 / 开机自启
+├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 剪贴板监听 / Agent 状态接收端(127.0.0.1:41799 回环) / 开机自启
+├── plugins/             # Agent 伴生插件: zcode-bridge(process hook + curl) / claude-bridge(http 型 hook 宿主直发)
 └── site/                # Vercel 静态落地页 (HTML/CSS/JS 零构建)
 ```
 
@@ -136,7 +148,7 @@ atoll/
   - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
   - 安装包大小仅 **~3.08 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
-  - **81 个单元测试全部自动化通过**。
+  - **89 个单元测试全部自动化通过**。
 
 ---
 

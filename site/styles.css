@@ -1097,3 +1097,71 @@ html.js .states-demo .reveal:nth-child(3) { transition-delay: 0.16s; }
   color: var(--text-muted);
   cursor: default;
 }
+
+/* ===== Agent 状态(v0.3.0):药丸状态点 + 面板活跃区,样式移植自 IslandPill/ExpandedPanel ===== */
+.agent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.agent-dot-working {
+  background: #38bdf8;
+  animation: agent-dot-breathe 2.2s ease-in-out infinite;
+}
+
+@keyframes agent-dot-breathe {
+  0%, 100% { opacity: 0.45; box-shadow: 0 0 2px rgba(56, 189, 248, 0.4); }
+  50% { opacity: 1; box-shadow: 0 0 5px rgba(56, 189, 248, 0.9); }
+}
+
+.agent-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--divider, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  background: var(--surface-overlay);
+}
+
+.agent-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-strip-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.agent-row-icon { font-size: 11px; flex-shrink: 0; }
+
+.agent-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-row-state { flex-shrink: 0; font-size: 10px; }
+.agent-row-time { flex-shrink: 0; font-size: 10px; color: var(--text-muted); }
+
+.agent-state-working { color: #38bdf8; }
+.agent-state-waiting { color: #f59e0b; font-weight: 600; }

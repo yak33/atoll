@@ -1,0 +1,8 @@
+# atoll-dsh-bridge bundle patch:向 profile 插入状态桥插件。
+# 后续层(用户的 cordis.patch.yml)可按 id `atoll-bridge` 覆盖这里的 config。
+- insert:
+    - id: atoll-bridge
+      name: 'atoll-dsh-bridge'
+      config:
+        endpoint: 'http://127.0.0.1:41799'
+        agentName: 'DeepSeek'

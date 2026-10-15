@@ -45,9 +45,11 @@ function playChime(frequency: number, durationMs: number): void {
   osc.stop(now + durationMs / 1000)
 }
 
-/** 音效语义:phase=番茄阶段切换,reset=额度窗口重置,copy=复制成功 */
-export function playSound(kind: 'phase' | 'reset' | 'copy'): void {
+/** 音效语义:phase=番茄阶段切换,reset=额度窗口重置,copy=复制成功,agent_waiting=Agent等待确认,agent_done=Agent任务完成 */
+export function playSound(kind: 'phase' | 'reset' | 'copy' | 'agent_waiting' | 'agent_done'): void {
   if (kind === 'phase') playChime(880, 220)
   else if (kind === 'reset') playChime(660, 300)
-  else playChime(1100, 150)
+  else if (kind === 'copy') playChime(1100, 150)
+  else if (kind === 'agent_waiting') playChime(980, 180)
+  else if (kind === 'agent_done') playChime(1318, 220)
 }

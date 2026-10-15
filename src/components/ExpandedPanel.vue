@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * 灵动岛展开面板(悬停态)。
- * 展示全部窗口(5h + 7d)、套餐、最后更新时间、错误详情,提供刷新/设置入口。
+ * 展示全部窗口(5h + 7d)、套餐、最后更新时间、错误详情,提供刷新/设置入口;
+ * 顶部有条件渲染的 Agent 活跃区(智能体模块合并进用量后的展示位)。
  * 悬停在本面板内则保持展开,离开由父组件延时收回。
  *
  * @author ZHANGCHAO 2026/10/01
@@ -10,6 +11,7 @@ import { computed } from 'vue'
 import type { QuotaError } from '../types'
 import { formatReset, resetUrgent, nowTick } from '../composables/nowTick'
 import { sparklinePoints, type UsageHistoryPoint } from '../core/usageHistory'
+import { stateIcon, stateLabel, type AgentItem } from '../core/agentHub'
 import ModuleTabs from './ModuleTabs.vue'
 import type { IslandModule } from '../core/appSettings'
 
@@ -29,6 +31,8 @@ const props = defineProps<{
   burnEstimate: string
   /** 24h 用量历史,双线趋势图;空数组不渲染 */
   history: UsageHistoryPoint[]
+  /** 活跃 Agent 列表(已按优先级排序,空数组不渲染该区) */
+  agents: AgentItem[]
 }>()
 
 const emit = defineEmits<{
@@ -38,6 +42,8 @@ const emit = defineEmits<{
   mouseleave: []
   dragstart: []
   switchModule: [module: IslandModule]
+  removeAgent: [id: string]
+  clearAgents: []
 }>()
 
 // ===== 整面板拖动移动窗口:位移超过阈值才算拖动;按钮上按下不参与 =====
@@ -93,6 +99,16 @@ function urgentOf(iso: string | null): boolean {
   if (iso === null) return false
   return resetUrgent(iso)
 }
+
+// Agent 行的相对时间:渲染时计算,列表更新或清扫时随之刷新
+function agentTimeAgo(timestamp: number): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
+  if (diffSec < 5) return '刚刚'
+  if (diffSec < 60) return `${diffSec}秒前`
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}分钟前`
+  return `${Math.floor(diffMin / 60)}小时前`
+}
 </script>
 
 <template>
@@ -107,6 +123,24 @@ function urgentOf(iso: string | null): boolean {
     <div class="tabs-row">
       <ModuleTabs :current="activeModule" @switch-module="(m) => emit('switchModule', m)" />
       <button class="gear-btn" type="button" title="设置" @click="emit('settings')">⚙</button>
+    </div>
+
+    <!-- Agent 活跃区:合并进用量模块的展示位;列表已按优先级排序,waiting 排最前 -->
+    <div v-if="agents.length > 0" class="agent-strip">
+      <div class="agent-strip-head">
+        <span class="agent-strip-title">Agent</span>
+        <button class="agent-strip-clear" type="button" title="清空全部 Agent 状态" @click="emit('clearAgents')">清空</button>
+      </div>
+      <!-- 多于可视行时内部滚动;data-scrollable 让滚轮滚动列表而不是切模块 -->
+      <div class="agent-strip-list" data-scrollable>
+        <div v-for="item in agents" :key="item.id" class="agent-row">
+          <span class="agent-row-icon">{{ stateIcon(item.state) }}</span>
+          <span class="agent-row-name" :title="item.task || item.name">{{ item.name }}</span>
+          <span :class="['agent-row-state', `agent-state-${item.state}`]">{{ stateLabel(item.state) }}</span>
+          <span class="agent-row-time">{{ agentTimeAgo(item.updatedAt) }}</span>
+          <button class="agent-row-close" type="button" title="移除此项" @click.stop="emit('removeAgent', item.id)">✕</button>
+        </div>
+      </div>
     </div>
 
     <div class="panel-header" title="按住任意位置拖动">
@@ -153,6 +187,143 @@ function urgentOf(iso: string | null): boolean {
 </template>
 
 <style scoped>
+/* ===== Agent 活跃区(条件渲染):无活跃 Agent 时不占任何空间 ===== */
+.agent-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--pill-border);
+  border-radius: 8px;
+  background: var(--surface-overlay);
+  cursor: default;
+}
+
+.agent-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-strip-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}
+
+.agent-strip-clear {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.agent-strip-clear:hover {
+  color: #f87171;
+}
+
+.agent-strip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* 上限保护:Agent 多时区内滚动,不把面板内容顶出窗口 */
+  max-height: 96px;
+  overflow-y: auto;
+}
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.agent-row-icon {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.agent-row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-row-state {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.agent-row-time {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-row-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 3px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.agent-row-close:hover {
+  color: var(--text-primary);
+}
+
+.agent-state-working {
+  color: #38bdf8;
+}
+
+.agent-state-waiting {
+  color: #f59e0b;
+  font-weight: 600;
+  animation: agent-wait-blink 1.5s ease-in-out infinite;
+}
+
+.agent-state-error {
+  color: #ef4444;
+}
+
+.agent-state-completed {
+  color: #4ade80;
+}
+
+.agent-state-stale,
+.agent-state-idle {
+  color: var(--text-muted);
+}
+
+@keyframes agent-wait-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-state-waiting {
+    animation: none;
+  }
+}
+
 .panel {
   display: flex;
   flex-direction: column;

@@ -1,0 +1,64 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "curl.exe",
+            "args": ["-s", "-m", "3", "-o", "NUL", "http://127.0.0.1:41799/api/agent/bridge?agent=zcode&name=ZCode&state=idle"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "curl.exe",
+            "args": ["-s", "-m", "3", "-o", "NUL", "http://127.0.0.1:41799/api/agent/bridge?agent=zcode&name=ZCode&state=working"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "curl.exe",
+            "args": ["-s", "-m", "3", "-o", "NUL", "http://127.0.0.1:41799/api/agent/bridge?agent=zcode&name=ZCode&state=working"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "curl.exe",
+            "args": ["-s", "-m", "3", "-o", "NUL", "http://127.0.0.1:41799/api/agent/bridge?agent=zcode&name=ZCode&state=waiting"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "process",
+            "command": "curl.exe",
+            "args": ["-s", "-m", "3", "-o", "NUL", "http://127.0.0.1:41799/api/agent/bridge?agent=zcode&name=ZCode&state=completed"],
+            "timeoutMs": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -12,7 +12,7 @@
  *
  * @author ZHANGCHAO 2026/09/30
  */
-import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { getCurrentWindow, currentMonitor, availableMonitors, primaryMonitor, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
@@ -23,6 +23,7 @@ import {
   loadClipboardHistory,
   loadCredential,
   loadDockFoldEnabled,
+  loadNotificationMode,
   loadTrayVisible,
   loadExpandDelayMs,
   loadPillPosition,
@@ -35,18 +36,26 @@ import {
   saveClipboardHistory,
   saveCredential,
   saveDockFoldEnabled,
+  saveNotificationMode,
   saveTrayVisible,
   saveExpandDelayMs,
   savePillPosition,
   saveUsageHistory,
   type AppearanceSettings,
   type IslandModule,
+  type NotificationMode,
   type PillPosition,
   type PomodoroSettings,
   type UsageAlerts,
   DEFAULT_APPEARANCE,
   DEFAULT_USAGE_ALERTS,
 } from './core/appSettings'
+import {
+  dequeueNotice,
+  enqueueNotice,
+  type IslandNotice,
+  type NoticeKind,
+} from './core/notifyQueue'
 import { estimateHoursToLimit, formatBurnEstimate, type BurnSample } from './core/burnRate'
 import {
   appendHistory,
@@ -61,6 +70,14 @@ import {
   type ClipboardImagePayload,
   type ClipboardItem,
 } from './core/clipboardHistory'
+import {
+  normalizeState,
+  removeAgent,
+  sweepAgents,
+  upsertAgent,
+  type AgentItem,
+  type AgentStatusPayload,
+} from './core/agentHub'
 import { invoke } from '@tauri-apps/api/core'
 import { initTheme } from './core/theme'
 import { applyInitialLayout, resizeInPlace, clampIntoWorkArea } from './core/windowLayout'
@@ -88,6 +105,7 @@ import {
 } from './core/edgeDock'
 import { playSound } from './core/sound'
 import MiniIsland from './components/MiniIsland.vue'
+import NoticeBubble from './components/NoticeBubble.vue'
 import type { ZhipuCredential } from './adapters/zhipu'
 import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
 import SettingsPanel from './components/SettingsPanel.vue'
@@ -101,9 +119,28 @@ function pillSize(): LogicalSize {
   return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT)
 }
 
+/** 气泡展示时药丸态窗口的临时加高量:气泡高度(44)+ 与药丸的间隙(8) */
+const NOTICE_BUBBLE_EXTRA_PX = 52
+
+/** 药丸态实际窗口尺寸:气泡弹出时加高,否则与基础药丸一致 */
+function pillModeSize(): LogicalSize {
+  const extra = activeNotice.value !== null ? NOTICE_BUBBLE_EXTRA_PX : 0
+  return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT + extra)
+}
+
 /** 展开态尺寸来自当前模块的注册表定义 */
 function expandedSize(): LogicalSize {
-  return moduleDef.value.expandedSize(appearance.value.pillWidth)
+  const base = moduleDef.value.expandedSize(appearance.value.pillWidth)
+  // 用量模块:Agent 活跃区出现时窗口临时加高,避免把趋势图/底栏挤出窗口;
+  // 无活跃 Agent 恢复基础尺寸,不留下会挡住下方应用的透明死区。
+  // 高度按「面板实际展示的条目」计算(idle 不展示),与 panelProps 的过滤口径一致
+  if (activeModule.value === 'usage') {
+    const visibleAgents = agentList.value.filter((item) => item.state !== 'idle').length
+    if (visibleAgents > 0) {
+      return new LogicalSize(base.width, base.height + Math.min(visibleAgents, 4) * 18 + 34)
+    }
+  }
+  return base
 }
 /** 鼠标离开面板后延迟收回,防止误触抖动(PRD §4.2) */
 const COLLAPSE_DELAY_MS = 500
@@ -242,7 +279,7 @@ async function handleAppearance(next: AppearanceSettings): Promise<void> {
   appearance.value = next
   applyOpacityVar()
   if (mode.value === 'pill') {
-    await resizeInPlace(pillSize())
+    await resizeInPlace(pillModeSize())
   }
 }
 
@@ -367,6 +404,207 @@ async function handleClipboardEnabled(next: boolean): Promise<void> {
   }
 }
 
+// ===== 智能体监控状态(已合并进用量模块:药丸状态点 + 用量面板顶部活跃区) =====
+const agentList = ref<AgentItem[]>([])
+/** 药丸状态点取值:waiting > error > working,全无活跃则 null(不显示) */
+const activeAgentState = computed<'working' | 'waiting' | 'error' | null>(() => {
+  const states = agentList.value.map((item) => item.state)
+  if (states.includes('waiting')) return 'waiting'
+  if (states.includes('error')) return 'error'
+  if (states.includes('working')) return 'working'
+  return null
+})
+
+/** 托盘/药丸 tooltip 的 Agent 摘要;null = 无活跃 Agent,不参与展示 */
+const agentSummaryText = computed<string | null>(() => {
+  if (activeAgentState.value === null) return null
+  if (activeAgentState.value === 'waiting') {
+    const first = agentList.value.find((item) => item.state === 'waiting')
+    return first ? `✋ ${first.name} 等待确认` : null
+  }
+  if (activeAgentState.value === 'error') {
+    const first = agentList.value.find((item) => item.state === 'error')
+    return first ? `⚠️ ${first.name} 异常中断` : null
+  }
+  const count = agentList.value.filter((item) => item.state === 'working').length
+  return count > 0 ? `⚡ ${count} 个 Agent 执行中` : null
+})
+
+function handleUpdateAgentStatus(payload: AgentStatusPayload): void {
+  // 提醒按归一化后的状态判断:外部可能上报 wait/ask/done 等同义词,与显示逻辑共用同一套语义
+  const nextState = normalizeState(payload.state)
+  const agentId = payload.id.trim()
+  const prevState = agentList.value.find((item) => item.id === agentId)?.state ?? null
+  const trimmedName = payload.name?.trim() ?? ''
+  const displayName = trimmedName !== '' ? trimmedName : agentId
+
+  agentList.value = upsertAgent(agentList.value, payload)
+
+  // waiting 不去重:每次权限请求都是新的打扰,都值得提醒;
+  // completed 只在状态变更沿上提醒,重复推送不重响
+  if (nextState === 'waiting') {
+    if (soundEnabled.value) playSound('agent_waiting')
+    void notifyUser('waiting', `${displayName} 等待确认`, payload.task || '请检查终端/窗口')
+  } else if (nextState === 'completed' && prevState !== 'completed') {
+    if (soundEnabled.value) playSound('agent_done')
+    void notifyUser('completed', `${displayName} 任务已完成`, payload.task || '')
+  }
+}
+
+function handleRemoveAgent(id: string): void {
+  agentList.value = removeAgent(agentList.value, id)
+}
+
+function handleClearAgents(): void {
+  agentList.value = []
+}
+
+// 60s 时钟清扫:hook 断流导致 working 永挂时降级为状态不明,completed 提示消费后衰减为待命
+watch(nowTick, () => {
+  if (agentList.value.length > 0) {
+    agentList.value = sweepAgents(agentList.value)
+  }
+})
+
+// 展开态下 Agent 数量变化(新增/清空/衰减为 idle)时按需调整窗口高度
+watch(
+  () => agentList.value.filter((item) => item.state !== 'idle').length,
+  async () => {
+    if (mode.value === 'expanded') {
+      await resizeInPlace(expandedSize())
+    }
+  },
+)
+let unlistenAgent: (() => void) | null = null
+
+// ===== 岛内气泡通知 =====
+// 统一通知入口是 notifyUser:按设置的通知方式与岛可见性路由(气泡/系统通知/回退)。
+// 气泡只在收起态展示;展开态下消息排队,收起后弹出,超过保质期(15s)静默作废。
+const notificationMode = ref<NotificationMode>('bubble')
+const noticeQueue = ref<IslandNotice[]>([])
+const activeNotice = ref<IslandNotice | null>(null)
+/** 悬停暂停:气泡上有鼠标时不推进自动收回 */
+let noticeHovered = false
+let noticeDismissTimer: number | null = null
+const NOTICE_DURATION_MS = 4000
+
+function cancelNoticeDismiss(): void {
+  if (noticeDismissTimer !== null) {
+    clearTimeout(noticeDismissTimer)
+    noticeDismissTimer = null
+  }
+}
+
+function scheduleNoticeDismiss(): void {
+  cancelNoticeDismiss()
+  noticeDismissTimer = window.setTimeout(() => {
+    noticeDismissTimer = null
+    if (noticeHovered) return
+    dismissActiveNotice()
+  }, NOTICE_DURATION_MS)
+}
+
+function dismissActiveNotice(): void {
+  cancelNoticeDismiss()
+  // 重置悬停标志:换新气泡后浏览器不一定重发 mouseenter,靠它防「永不收回」的卡死
+  noticeHovered = false
+  activeNotice.value = null
+  advanceNotice()
+}
+
+/** 出队并展示下一条;不满足展示条件(非收起态/折叠中/关闭气泡)时留在队列里等时机 */
+function advanceNotice(): void {
+  if (activeNotice.value !== null) return
+  if (notificationMode.value === 'system') return
+  if (mode.value !== 'pill' || dockEdge.value !== null || manualHidden.value) return
+  const { queue, notice } = dequeueNotice(noticeQueue.value)
+  noticeQueue.value = queue
+  if (notice === null) return
+  activeNotice.value = notice
+  scheduleNoticeDismiss()
+}
+
+async function safeWindowVisible(): Promise<boolean> {
+  try {
+    return await getCurrentWindow().isVisible()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 统一通知入口。
+ * 岛内气泡:窗口可见且未折叠时入队展示(展开态排队,收起后弹出);
+ * 岛不可见(全屏隐藏/托盘隐藏/贴顶折叠)或选择系统通知时走 Windows 通知。
+ */
+async function notifyUser(kind: NoticeKind, title: string, detail: string = ''): Promise<void> {
+  const preferBubble = notificationMode.value !== 'system'
+  const preferSystem = notificationMode.value === 'system' || notificationMode.value === 'both'
+  let bubbled = false
+  if (preferBubble) {
+    const windowVisible = await safeWindowVisible()
+    if (windowVisible && !manualHidden.value && dockEdge.value === null) {
+      noticeQueue.value = enqueueNotice(noticeQueue.value, kind, title, detail)
+      advanceNotice()
+      bubbled = true
+    }
+  }
+  if (preferSystem || (preferBubble && !bubbled)) {
+    void sendToast(detail !== '' ? `${title}:${detail}` : title)
+  }
+}
+
+/** 气泡悬停:暂停收回计时,并取消悬停展开计时(正在读气泡,别突然展开面板) */
+function handleNoticeEnter(): void {
+  noticeHovered = true
+  cancelExpand()
+  cancelNoticeDismiss()
+}
+
+function handleNoticeLeave(): void {
+  noticeHovered = false
+  if (activeNotice.value !== null) {
+    scheduleNoticeDismiss()
+  }
+}
+
+/** 点击气泡:关掉气泡并跳到对应模块的展开面板 */
+async function handleNoticeClick(): Promise<void> {
+  const kind = activeNotice.value?.kind
+  dismissActiveNotice()
+  if (kind === 'info') {
+    if (activeModule.value !== 'pomodoro') await handleSwitchModule('pomodoro')
+  } else {
+    // waiting/completed/error/reset 都属于用量模块的信息
+    if (activeModule.value !== 'usage') await handleSwitchModule('usage')
+  }
+  await enterMode('expanded')
+}
+
+async function handleNotificationMode(next: NotificationMode): Promise<void> {
+  notificationMode.value = next
+  if (next === 'system') {
+    // 切到系统通知:清掉岛内积压,避免残留旧气泡
+    noticeQueue.value = []
+    if (activeNotice.value !== null) dismissActiveNotice()
+  }
+  try {
+    await saveNotificationMode(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
+// 气泡出现/消失:药丸态窗口就地加高/回落(锚定左上角,向下生长)
+watch(activeNotice, () => {
+  void applyPillModeSize()
+})
+
+async function applyPillModeSize(): Promise<void> {
+  if (mode.value !== 'pill' || dockEdge.value !== null) return
+  await resizeInPlace(pillModeSize())
+}
+
 /** 贴顶折叠开关:关闭立即恢复完整胶囊,后续不再折叠 */
 async function handleDockFoldEnabled(next: boolean): Promise<void> {
   dockFoldEnabled.value = next
@@ -434,7 +672,7 @@ const poller = new QuotaPoller({
     quotaError.value = null
     // 窗口重置提醒(toast);不 await,通知失败不影响主流程
     messages.forEach((message) => {
-      void sendToast(message)
+      void notifyUser('reset', message)
     })
     if (messages.length > 0 && soundEnabled.value) playSound('reset')
   },
@@ -461,6 +699,7 @@ onMounted(async () => {
   clipboardEnabled.value = await loadClipboardEnabled()
   dockFoldEnabled.value = await loadDockFoldEnabled()
   expandDelayMs.value = await loadExpandDelayMs()
+  notificationMode.value = await loadNotificationMode()
   const savedPos = await loadPillPosition()
   lastPersistedPos = savedPos
   applyOpacityVar()
@@ -500,6 +739,22 @@ onMounted(async () => {
     scheduleSaveClipboard()
   })
 
+  // 智能体状态变更(HTTP 41799 端口上报驱动)
+  unlistenAgent = await listen<AgentStatusPayload>('agent:status-changed', (event) => {
+    handleUpdateAgentStatus(event.payload)
+  })
+
+  // 接收服务状态:用命令查询而非事件推送,规避「Rust 已发事件但前端尚未挂监听」的启动竞态。
+  // 独立面板已移除,端口冲突这种罕见异常用一次性 toast 告知即可
+  try {
+    const status = await invoke<{ running: boolean; port: number }>('agent_server_status')
+    if (!status.running) {
+      void notifyUser('error', '智能体接收服务未启动', `端口 ${status.port} 被占用,Agent 状态上报不可用`)
+    }
+  } catch {
+    // 查询失败静默跳过,不在启动路径上抛错
+  }
+
   // 出屏守卫:2 秒轮询,静止且完全出屏时拉回主屏
   guardTimer = window.setInterval(() => {
     void guardOffscreen()
@@ -527,7 +782,7 @@ onMounted(async () => {
     const now = Date.now()
     if (lastPomoTickAt !== 0 && now - lastPomoTickAt > 120_000) {
       pomo.value = pause(pomo.value, lastPomoTickAt)
-      void sendToast('⏸️ 检测到系统休眠,番茄钟已暂停,回来后点开始继续')
+      void notifyUser('info', '检测到系统休眠,番茄钟已暂停', '回来后点开始继续')
       lastPomoTickAt = now
       return
     }
@@ -538,7 +793,10 @@ onMounted(async () => {
       pomo.value = result.state
       const workMin = Math.round(result.state.workMs / 60_000)
       const breakMin = Math.round(result.state.breakMs / 60_000)
-      void sendToast(result.completed === 'work' ? `🍅 专注完成,休息 ${breakMin} 分钟` : `☕ 休息结束,开始专注 ${workMin} 分钟`)
+      void notifyUser(
+        'info',
+        result.completed === 'work' ? `🍅 专注完成,休息 ${breakMin} 分钟` : `☕ 休息结束,开始专注 ${workMin} 分钟`,
+      )
       if (soundEnabled.value) playSound('phase')
     }
   }, 1000)
@@ -559,6 +817,7 @@ onBeforeUnmount(() => {
   unlistenTraySettings?.()
   unlistenClipboard?.()
   unlistenClipboardImage?.()
+  unlistenAgent?.()
   window.clearInterval(guardTimer)
   stopFullscreenWatch?.()
   disposeTheme?.()
@@ -575,7 +834,11 @@ async function enterMode(target: IslandMode): Promise<void> {
     await undock()
   }
   mode.value = target
-  const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillSize()
+  // 回收起态时先尝试出队气泡,让 pillModeSize 一次算对高度
+  if (target === 'pill') {
+    advanceNotice()
+  }
+  const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillModeSize()
   const anchor = await resizeInPlace(size)
   if (anchor === null) return
   const pos = { x: anchor.x, y: anchor.y }
@@ -657,6 +920,8 @@ let pillDragMoved = false
 
 function handlePillMouseDown(event: MouseEvent): void {
   if (event.button !== 0) return
+  // 气泡与按钮上的按下留给点击,不进入拖动判定
+  if ((event.target as HTMLElement).closest('button, .notice-bubble') !== null) return
   pillDragArmed = true
   pillDragMoved = false
   pillDownX = event.clientX
@@ -741,6 +1006,12 @@ function scheduleDock(): void {
 
 async function dockNow(): Promise<void> {
   if (mode.value !== 'pill' || dockEdge.value !== null || manualHidden.value) return
+  // 折叠态不支持气泡:先收掉气泡并把窗口回落到基础药丸尺寸,
+  // 否则折叠判定以加高后的矩形计算,唤回时也会带着多余高度
+  if (activeNotice.value !== null) {
+    dismissActiveNotice()
+    await applyPillModeSize()
+  }
   const win = getCurrentWindow()
   try {
     const [pos, size, curMon] = await Promise.all([
@@ -821,6 +1092,8 @@ async function undock(): Promise<void> {
 async function handleDockRestore(): Promise<void> {
   cancelDock()
   await undock()
+  // 折叠期间消息走的是系统通知,这里恢复气泡通道,处理残余队列
+  advanceNotice()
 }
 
 // ===== 窗口出屏守卫(轮询版) =====
@@ -1015,8 +1288,13 @@ const tooltipText = computed<string>(() => {
   return parts.join('\n') || '点击打开设置'
 })
 
-// 托盘 Tooltip:根据当前模块及状态实时同步(全屏/隐藏时悬停托盘也能看清实时状态)
+// 托盘 Tooltip:Agent 状态时间敏感度最高,有活跃 Agent 时优先显示;
+// 否则按当前模块同步(全屏/隐藏时悬停托盘也能看清实时状态)
 watchEffect(() => {
+  if (agentSummaryText.value !== null) {
+    void updateTrayTooltip(`atoll · ${agentSummaryText.value}`)
+    return
+  }
   if (activeModule.value === 'usage') {
     if (credential.value === null) {
       void updateTrayTooltip('atoll · 点此配置 API Key')
@@ -1030,13 +1308,15 @@ watchEffect(() => {
     } else {
       void updateTrayTooltip('atoll · 正在加载额度…')
     }
-  } else {
+  } else if (activeModule.value === 'pomodoro') {
     const p = pomoView.value
     if (p.running) {
       void updateTrayTooltip(`atoll · ${p.phase === 'work' ? '🍅 专注' : '☕ 休息'} ${p.remainText}`)
     } else {
       void updateTrayTooltip(`atoll · 🍅 番茄钟 (${p.stateText || '就绪'})`)
     }
+  } else if (activeModule.value === 'clipboard') {
+    void updateTrayTooltip(`atoll · 📋 剪贴板历史 (${clipboardItems.value.length} 条)`)
   }
 })
 
@@ -1059,13 +1339,18 @@ const pillProps = computed<Record<string, unknown>>(() => {
       glowEffects: appearance.value.glowEffects,
     }
   }
+  // 用量模块(默认):Agent 有活跃状态时 tooltip 顶部附一行摘要,与药丸状态点呼应
   return {
     win: primary.value,
     text: pillText.value,
     hasError: quotaError.value !== null,
-    tooltip: tooltipText.value,
+    tooltip:
+      agentSummaryText.value !== null
+        ? `${agentSummaryText.value}\n${tooltipText.value}`
+        : tooltipText.value,
     warnAt: usageAlerts.value.warnAt,
     criticalAt: usageAlerts.value.criticalAt,
+    agentState: activeAgentState.value,
     glowEffects: appearance.value.glowEffects,
   }
 })
@@ -1077,8 +1362,10 @@ const panelProps = computed<Record<string, unknown>>(() => {
   if (activeModule.value === 'clipboard') {
     return { activeModule: activeModule.value, items: clipboardItems.value, enabled: clipboardEnabled.value }
   }
+  // 用量模块(默认):附活跃 Agent 列表(idle 项已衰减,不值得占位)
   return {
     activeModule: activeModule.value,
+    agents: agentList.value.filter((item) => item.state !== 'idle'),
     windows: snapshot.value?.windows ?? [],
     planLevel: snapshot.value?.planLevel ?? '',
     source: snapshot.value?.source ?? 'tokens_limit',
@@ -1106,7 +1393,8 @@ const panelEvents = computed<Record<string, unknown>>(() => {
       clear: handleClipboardClear,
     }
   }
-  return { refresh: handleRefresh, settings: openSettings }
+  // 用量模块(默认):Agent 活跃区的移除/清空
+  return { refresh: handleRefresh, settings: openSettings, removeAgent: handleRemoveAgent, clearAgents: handleClearAgents }
 })
 </script>
 
@@ -1137,6 +1425,15 @@ const panelEvents = computed<Record<string, unknown>>(() => {
         @wheel="handlePillWheel"
       />
     </Transition>
+    <!-- 岛内气泡:药丸下方垂落,仅收起态出现;悬停暂停收回,点击跳对应模块 -->
+    <NoticeBubble
+      v-if="dockEdge === null && activeNotice !== null"
+      :notice="activeNotice"
+      @mouseenter="handleNoticeEnter"
+      @mouseleave="handleNoticeLeave"
+      @click="handleNoticeClick"
+      @close="dismissActiveNotice"
+    />
   </div>
 
   <!-- 展开态:注册表动态挂载面板;Tab 切换,滚轮切模块,模块特有事件由 panelEvents 组装 -->
@@ -1165,6 +1462,7 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     @clipboard-enabled="handleClipboardEnabled"
     @dock-fold-enabled="handleDockFoldEnabled"
     @expand-delay-ms="handleExpandDelayMs"
+    @notification-mode="handleNotificationMode"
     @tray-visible="handleTrayVisible"
     @quit="quitApp"
     @clipboard-clear="handleClipboardClearAll"
@@ -1361,6 +1659,8 @@ html[data-theme='light'][data-skin='cyber'] {
 .pill-shell {
   width: 100%;
   height: 100vh;
+  /* 气泡以绝对定位垂挂在药丸下方,壳层是它的定位上下文 */
+  position: relative;
 }
 
 /* ===== 药丸基座(全局):用量/番茄两种药丸共用的容器外观 ===== */
@@ -1369,9 +1669,9 @@ html[data-theme='light'][data-skin='cyber'] {
   display: flex;
   align-items: center;
   gap: 8px;
-  /* 100vh 而非 100%:根组件父级是 body(无高度),百分比会退化成内容高度,
-     药丸会缩成一行字高;窗口高度就是药丸高度,用视口高度撑满 */
-  height: 100vh;
+  /* 固定 44px(与 App.vue 的 PILL_HEIGHT 对应):药丸态窗口正常时就是 44 高,
+     用视口高度与固定高度渲染一致;气泡弹出窗口临时加高时,固定高度保证药丸不被拉长 */
+  height: 44px;
   padding: 0 14px;
   box-sizing: border-box;
   border-radius: 9999px;

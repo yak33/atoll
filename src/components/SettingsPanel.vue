@@ -12,6 +12,7 @@ import {
   loadAppearance,
   loadDockFoldEnabled,
   loadExpandDelayMs,
+  loadNotificationMode,
   loadTrayVisible,
   loadClipboardEnabled,
   loadPomodoro,
@@ -29,6 +30,7 @@ import {
   type AppearanceSettings,
   type GlowEffect,
   type IslandModule,
+  type NotificationMode,
   type PomodoroSettings,
   type SkinTheme,
   type ThemeMode,
@@ -52,6 +54,7 @@ const emit = defineEmits<{
   clipboardClear: []
   dockFoldEnabled: [enabled: boolean]
   expandDelayMs: [ms: number]
+  notificationMode: [mode: NotificationMode]
   trayVisible: [visible: boolean]
   quit: []
   resetPosition: []
@@ -106,6 +109,20 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'dark', label: '深色' },
 ]
 const themeMode = ref<ThemeMode>('auto')
+
+// 通知方式:三选一;岛不可见(隐藏/折叠)时气泡模式自动回退系统通知
+const NOTIFY_MODE_OPTIONS: { value: NotificationMode; label: string }[] = [
+  { value: 'bubble', label: '岛内气泡' },
+  { value: 'system', label: '系统通知' },
+  { value: 'both', label: '两者' },
+]
+const notifyMode = ref<NotificationMode>('bubble')
+
+function handleNotifyMode(next: NotificationMode): void {
+  if (notifyMode.value === next) return
+  notifyMode.value = next
+  emit('notificationMode', next)
+}
 
 // 外观自定义:拖动实时预览(emit 给 App),松手落盘
 const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
@@ -244,6 +261,7 @@ onMounted(async () => {
   dockFoldOn.value = await loadDockFoldEnabled()
   expandDelay.value = await loadExpandDelayMs()
   trayVisibleOn.value = await loadTrayVisible()
+  notifyMode.value = await loadNotificationMode()
   try {
     autostartOn.value = await isEnabled()
   } catch {
@@ -600,6 +618,20 @@ onBeforeUnmount(() => {
     <button class="reset-pos-btn" type="button" @click="emit('resetPosition')">重置窗口位置(回到顶部居中)</button>
 
     <div class="section-title">系统</div>
+    <div class="field-label">通知方式</div>
+    <div class="theme-row">
+      <button
+        v-for="option in NOTIFY_MODE_OPTIONS"
+        :key="option.value"
+        :class="['theme-btn', notifyMode === option.value ? 'theme-btn-active' : '']"
+        type="button"
+        @click="handleNotifyMode(option.value)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+    <span class="field-hint">岛内气泡从药丸下方弹出,约 4 秒自动收回,悬停可暂停;岛被隐藏或贴顶折叠时自动回退系统通知</span>
+
     <label class="toggle-row">
       <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
       <span class="field-label">开机自动启动</span>

@@ -1,0 +1,17 @@
+{
+  "name": "atoll-dsh-bridge",
+  "description": "Report DeepSeek Harness session status (working / waiting / completed) to the atoll desktop island via local HTTP bridge",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "*"
+  }
+}

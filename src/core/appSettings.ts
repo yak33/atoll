@@ -332,6 +332,26 @@ export async function saveExpandDelayMs(value: number): Promise<void> {
   await store.save()
 }
 
+/** 通知方式:岛内气泡(默认) / 系统通知 / 两者 */
+export type NotificationMode = 'bubble' | 'system' | 'both'
+
+export async function loadNotificationMode(): Promise<NotificationMode> {
+  try {
+    const store = await getStore()
+    const value = await store.get<NotificationMode>('notification_mode')
+    if (value === 'bubble' || value === 'system' || value === 'both') return value
+  } catch {
+    // 读取失败回落岛内气泡
+  }
+  return 'bubble'
+}
+
+export async function saveNotificationMode(mode: NotificationMode): Promise<void> {
+  const store = await getStore()
+  await store.set('notification_mode', mode)
+  await store.save()
+}
+
 /** 剪贴板历史读写:结构与淘汰规则见 core/clipboardHistory.ts */
 export async function loadClipboardHistory(): Promise<ClipboardItem[]> {
   try {

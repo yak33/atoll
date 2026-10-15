@@ -1,0 +1,18 @@
+{
+  "name": "atoll-bridges",
+  "owner": { "name": "ZHANGCHAO" },
+  "plugins": [
+    {
+      "name": "atoll-zcode-bridge",
+      "source": "./zcode-bridge",
+      "description": "Report ZCode session status (working / waiting / completed) to the atoll desktop island",
+      "version": "0.1.0"
+    },
+    {
+      "name": "atoll-claude-bridge",
+      "source": "./claude-bridge",
+      "description": "Report Claude Code session status (working / waiting / completed) to the atoll desktop island",
+      "version": "0.1.0"
+    }
+  ]
+}

@@ -22,6 +22,8 @@ const props = defineProps<{
   /** 告警阈值(百分点,设置面板可配):>=criticalAt 红色脉冲,>=warnAt 琥珀 */
   warnAt: number
   criticalAt: number
+  /** Agent 活跃指示:working/waiting/error 在药丸右端显示状态点,null 不显示 */
+  agentState: 'working' | 'waiting' | 'error' | null
   /** 偶发光效种类(设置面板可配);空数组 = 不播放 */
   glowEffects: GlowEffect[]
 }>()
@@ -77,6 +79,8 @@ const resetHighlight = computed<boolean>(() => {
       <span v-if="hasError" class="warn-dot">!</span>
     </template>
     <span v-else class="empty">{{ text || '--' }}</span>
+    <!-- Agent 状态点:无活跃 Agent 时不渲染,用量内容不受影响 -->
+    <span v-if="agentState" :class="['agent-dot', `agent-dot-${agentState}`]"></span>
   </div>
 </template>
 
@@ -191,6 +195,63 @@ const resetHighlight = computed<boolean>(() => {
   font-size: 10px;
   font-weight: 700;
   color: #f59e0b;
+}
+
+/* ===== Agent 状态指示点(药丸右端) =====
+   working 青蓝呼吸 / waiting 琥珀跳动 / error 红色常亮;
+   动效克制,不与用量告警配色抢注意力 */
+.agent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.agent-dot-working {
+  background: #38bdf8;
+  animation: agent-dot-breathe 2.2s ease-in-out infinite;
+}
+
+.agent-dot-waiting {
+  background: #f59e0b;
+  animation: agent-dot-hop 1.1s ease-in-out infinite;
+}
+
+.agent-dot-error {
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+}
+
+@keyframes agent-dot-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    box-shadow: 0 0 2px rgba(56, 189, 248, 0.4);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 5px rgba(56, 189, 248, 0.9);
+  }
+}
+
+@keyframes agent-dot-hop {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-dot-working,
+  .agent-dot-waiting {
+    animation: none;
+  }
 }
 
 .empty {

@@ -383,7 +383,6 @@ onBeforeUnmount(() => {
         <span class="field-label">项目 ID(可选)</span>
         <input v-model="projectId" type="text" class="input" placeholder="bigmodel-project" autocomplete="off" />
       </label>
-      <span class="field-hint">团队版必填组织 ID,否则官方返回「当前用户不存在coding plan」</span>
 
       <div class="section-title">告警阈值</div>
       <div class="slider-field">
@@ -454,7 +453,6 @@ onBeforeUnmount(() => {
           @change="commitPomoDurations"
         />
       </div>
-      <span class="field-hint">进行中的阶段按原时长走完,下一阶段生效;重置立即应用当前配置</span>
     </template>
 
     <!-- ===== 剪贴板模块设置 ===== -->
@@ -468,10 +466,6 @@ onBeforeUnmount(() => {
         />
         <span class="field-label">记录剪贴板历史</span>
       </label>
-      <span class="field-hint">
-        仅记录纯文本(图像/文件忽略),重复复制自动去重置顶;上限 200 条,置顶条目豁免淘汰。
-        数据只保存在本机,不联网不上传。敏感内容建议及时删除或关闭记录。
-      </span>
       <button class="reset-pos-btn" type="button" @click="emit('clipboardClear')">清空全部历史(含置顶)</button>
     </template>
 
@@ -630,7 +624,6 @@ onBeforeUnmount(() => {
         {{ option.label }}
       </button>
     </div>
-    <span class="field-hint">岛内气泡从药丸下方弹出,约 4 秒自动收回,悬停可暂停;岛被隐藏或贴顶折叠时自动回退系统通知</span>
 
     <label class="toggle-row">
       <input v-model="autostartOn" type="checkbox" class="checkbox" @change="handleAutostartToggle" />
@@ -646,7 +639,6 @@ onBeforeUnmount(() => {
       />
       <span class="field-label">贴顶自动折叠</span>
     </label>
-    <span class="field-hint">贴顶静止 3 秒后折叠为 3px 霓虹横条,移入即恢复;关闭后永远保持完整胶囊</span>
 
     <label class="toggle-row">
       <input
@@ -657,7 +649,6 @@ onBeforeUnmount(() => {
       />
       <span class="field-label">显示托盘图标</span>
     </label>
-    <span class="field-hint">关闭后托盘图标隐藏,在此处随时恢复</span>
 
     <button class="reset-pos-btn" type="button" @click="emit('quit')">退出 atoll</button>
 
@@ -985,12 +976,6 @@ onBeforeUnmount(() => {
 .field-label {
   font-size: 11px;
   color: var(--text-secondary);
-}
-
-.field-hint {
-  font-size: 10px;
-  color: var(--text-muted);
-  line-height: 1.4;
 }
 
 .input {

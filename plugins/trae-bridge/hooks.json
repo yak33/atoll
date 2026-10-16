@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "name": "atoll-idle",
+        "enabled": true,
+        "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=trae&name=Trae&state=idle\""
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "name": "atoll-working",
+        "enabled": true,
+        "matcher": "",
+        "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=trae&name=Trae&state=working\""
+      }
+    ],
+    "PostToolUse": [
+      {
+        "name": "atoll-heartbeat",
+        "enabled": true,
+        "matcher": ".*",
+        "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=trae&name=Trae&state=working\""
+      }
+    ],
+    "Notification": [
+      {
+        "name": "atoll-waiting",
+        "enabled": true,
+        "matcher": "*",
+        "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=trae&name=Trae&state=waiting\""
+      }
+    ],
+    "Stop": [
+      {
+        "name": "atoll-completed",
+        "enabled": true,
+        "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=trae&name=Trae&state=completed\""
+      }
+    ]
+  }
+}

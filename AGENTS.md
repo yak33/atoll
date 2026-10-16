@@ -32,7 +32,7 @@ Windows 桌面灵动岛悬浮组件(Tauri 2 + Vue 3 + TS)。首个模块:智谱 
 - `src-tauri/src/lib.rs` —— Rust 壳层:托盘/全屏探测/剪贴板监听 + `agent_server` 模块(127.0.0.1:41799 回环 HTTP 接收端,两端点:`POST /api/agent/status` 完整 JSON、`GET/POST /api/agent/bridge?agent=&state=` 轻量桥;`agent_server_status` 命令查端口绑定)
 - `src-tauri/tauri.conf.json` —— 窗口形态(透明/置顶/无边框)唯一配置点
 - `src-tauri/capabilities/default.json` —— http 域名白名单、store、通知、窗口尺寸/定位权限
-- `plugins/` —— Agent 伴生插件市场(本地目录市场):`zcode-bridge`(ZCode process 型 hook 调 curl.exe)、`claude-bridge`(Claude Code http 型 hook 宿主直发)、`antigravity-bridge`(官方 hooks.json,全局装在 ~/.gemini/config/hooks.json)、`qoder-bridge`(官方 hooks 合并进 ~/.qoder(-cn)/settings.json 的 hooks 键,重启 IDE 生效;一键安装脚本 scripts/install-qoder-bridge.mjs)、`deepseek-bridge`(dsh Cordis 插件);安装说明在 plugins/README.md
+- `plugins/` —— Agent 伴生插件市场(本地目录市场):`zcode-bridge`(ZCode process 型 hook 调 curl.exe)、`claude-bridge`(Claude Code http 型 hook 宿主直发)、`antigravity-bridge`(官方 hooks.json,全局装在 ~/.gemini/config/hooks.json)、`qoder-bridge`(官方 hooks 合并进 ~/.qoder(-cn)/settings.json 的 hooks 键,重启 IDE 生效;一键安装脚本 scripts/install-qoder-bridge.mjs)、`trae-bridge`(官方 hooks 合并进 ~/.trae(-cn)/hooks.json 全局文件,重启生效;一键安装脚本 scripts/install-trae-bridge.mjs)、`deepseek-bridge`(dsh Cordis 插件);安装说明在 plugins/README.md
 - `site/` —— 对外落地页,纯静态 HTML/CSS/JS 零构建,经 Vercel 部署。与 `src/` 不共享代码:药丸与面板样式是从 App.vue / components 手工移植的副本,改产品外观时记得同步这里
 
 模块约定:每个功能模块 = 独立 core 逻辑 + 独立药丸/面板组件对;容器层(App.vue)持有 `activeModule` 并负责切换(收起态滚轮、展开面板 Tab)与持久化;新模块照番茄钟的模式追加。**例外:Agent 监控没有独立模块位**——它并入了用量模块(药丸状态点 + 面板活跃区 + 气泡通知),core 层(agentHub/notifyQueue)仍独立。

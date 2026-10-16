@@ -14,6 +14,11 @@ describe('notifyQueue core logic', () => {
     expect(queue[4]?.title).toBe('消息7')
   })
 
+  it('carries agentId for sticky working notices', () => {
+    const queue = enqueueNotice([], 'working', 'ZCode 开始执行', '', 1_000_000, 'zcode')
+    expect(queue[0]?.agentId).toBe('zcode')
+  })
+
   it('deduplicates identical notices inside the window', () => {
     const now = 1_000_000
     let queue: IslandNotice[] = []

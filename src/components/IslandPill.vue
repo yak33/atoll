@@ -209,8 +209,22 @@ const resetHighlight = computed<boolean>(() => {
 }
 
 .agent-dot-working {
+  position: relative;
   background: #38bdf8;
-  animation: agent-dot-breathe 2.2s ease-in-out infinite;
+  /* 登场先弹跳一次(元素出现时播放),随后进入声呐呼吸循环 */
+  animation:
+    agent-dot-pop 0.35s var(--ease-spring, cubic-bezier(0.34, 1.4, 0.64, 1)),
+    agent-dot-breathe 2.4s ease-in-out 0.35s infinite;
+}
+
+/* 声呐涟漪:光点外一圈持续扩散的青蓝环,执行中的存在感主要来自它 */
+.agent-dot-working::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 189, 248, 0.8);
+  animation: agent-dot-ping 2.4s ease-out infinite;
 }
 
 .agent-dot-waiting {
@@ -235,6 +249,30 @@ const resetHighlight = computed<boolean>(() => {
   }
 }
 
+@keyframes agent-dot-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@keyframes agent-dot-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes agent-dot-hop {
   0%,
   100% {
@@ -251,6 +289,10 @@ const resetHighlight = computed<boolean>(() => {
   .agent-dot-working,
   .agent-dot-waiting {
     animation: none;
+  }
+  /* 减少动态效果时涟漪环直接隐藏,避免静止的圆环挂在药丸上 */
+  .agent-dot-working::after {
+    display: none;
   }
 }
 

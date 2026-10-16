@@ -119,12 +119,14 @@ function pillSize(): LogicalSize {
   return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT)
 }
 
-/** 气泡展示时药丸态窗口的临时加高量:气泡高度(44)+ 与药丸的间隙(8) */
+/** 气泡展示时药丸态窗口的临时加高量:首条 52(气泡 44 + 间隙 8),其后每条 50(44 + 6) */
 const NOTICE_BUBBLE_EXTRA_PX = 52
+const NOTICE_BUBBLE_PER_EXTRA_PX = 50
 
-/** 药丸态实际窗口尺寸:气泡弹出时加高,否则与基础药丸一致 */
+/** 药丸态实际窗口尺寸:按在屏气泡数量加高,无气泡与基础药丸一致 */
 function pillModeSize(): LogicalSize {
-  const extra = activeNotice.value !== null ? NOTICE_BUBBLE_EXTRA_PX : 0
+  const count = Math.min(activeNotices.value.length, MAX_ACTIVE_NOTICES)
+  const extra = count > 0 ? NOTICE_BUBBLE_EXTRA_PX + (count - 1) * NOTICE_BUBBLE_PER_EXTRA_PX : 0
   return new LogicalSize(appearance.value.pillWidth, PILL_HEIGHT + extra)
 }
 
@@ -440,29 +442,41 @@ function handleUpdateAgentStatus(payload: AgentStatusPayload): void {
 
   agentList.value = upsertAgent(agentList.value, payload)
 
+  // 开始执行按变更沿触发(与 completed 同策略):工具调用的心跳上报不会重复弹气泡
+  if (nextState === 'working' && prevState !== 'working') {
+    void notifyUser('working', `${displayName} 正在努力工作中...`, payload.task || '', agentId)
+  }
   // waiting 不去重:每次权限请求都是新的打扰,都值得提醒;
   // completed 只在状态变更沿上提醒,重复推送不重响
   if (nextState === 'waiting') {
     if (soundEnabled.value) playSound('agent_waiting')
-    void notifyUser('waiting', `${displayName} 等待确认`, payload.task || '请检查终端/窗口')
+    void notifyUser('waiting', `${displayName} 等待确认`, payload.task || '请检查终端/窗口', agentId)
   } else if (nextState === 'completed' && prevState !== 'completed') {
     if (soundEnabled.value) playSound('agent_done')
-    void notifyUser('completed', `${displayName} 任务已完成`, payload.task || '')
+    void notifyUser('completed', `${displayName} 已经干完活啦...`, payload.task || '', agentId)
   }
+
+  // 常驻 working 气泡:该 Agent 已转入其他状态时立即收回,让位给刚入队的新消息
+  syncStickyWorkingNotice()
 }
 
 function handleRemoveAgent(id: string): void {
   agentList.value = removeAgent(agentList.value, id)
+  // 被移除的 Agent 若正挂着常驻气泡,一并收回
+  syncStickyWorkingNotice()
 }
 
 function handleClearAgents(): void {
   agentList.value = []
+  syncStickyWorkingNotice()
 }
 
-// 60s 时钟清扫:hook 断流导致 working 永挂时降级为状态不明,completed 提示消费后衰减为待命
+// 60s 时钟清扫:hook 断流导致 working 永挂时降级为状态不明,completed 提示消费后衰减为待命;
+// 清扫可能让常驻 working 气泡的 Agent 离开执行态,随之收回
 watch(nowTick, () => {
   if (agentList.value.length > 0) {
     agentList.value = sweepAgents(agentList.value)
+    syncStickyWorkingNotice()
   }
 })
 
@@ -479,49 +493,96 @@ let unlistenAgent: (() => void) | null = null
 
 // ===== 岛内气泡通知 =====
 // 统一通知入口是 notifyUser:按设置的通知方式与岛可见性路由(气泡/系统通知/回退)。
-// 气泡只在收起态展示;展开态下消息排队,收起后弹出,超过保质期(15s)静默作废。
+// 气泡只在收起态展示,同时最多 MAX_ACTIVE_NOTICES 条并排(多 Agent 各自可见);
+// 展开态下排队,收起后弹出,超过保质期(15s)静默作废。
 const notificationMode = ref<NotificationMode>('bubble')
 const noticeQueue = ref<IslandNotice[]>([])
-const activeNotice = ref<IslandNotice | null>(null)
-/** 悬停暂停:气泡上有鼠标时不推进自动收回 */
-let noticeHovered = false
-let noticeDismissTimer: number | null = null
+/** 正在展示的气泡,数组顺序即上下堆叠顺序 */
+const activeNotices = ref<IslandNotice[]>([])
+/** 同屏气泡上限:两个 Agent 的进行时状态可以并排可见 */
+const MAX_ACTIVE_NOTICES = 2
+/** 悬停暂停:记录有鼠标停驻的气泡 id,对应收回计时暂停 */
+const hoveredNoticeIds = new Set<number>()
+/** 各气泡独立的自动收回计时器,按通知 id 索引 */
+const noticeDismissTimers = new Map<number, number>()
+/** 短停留:waiting / reset / info */
 const NOTICE_DURATION_MS = 4000
+/** 长停留:completed / error(值得多看一眼) */
+const NOTICE_DURATION_LONG_MS = 8000
 
-function cancelNoticeDismiss(): void {
-  if (noticeDismissTimer !== null) {
-    clearTimeout(noticeDismissTimer)
-    noticeDismissTimer = null
+function cancelNoticeDismiss(id: number): void {
+  const timer = noticeDismissTimers.get(id)
+  if (timer !== undefined) {
+    clearTimeout(timer)
+    noticeDismissTimers.delete(id)
   }
 }
 
-function scheduleNoticeDismiss(): void {
-  cancelNoticeDismiss()
-  noticeDismissTimer = window.setTimeout(() => {
-    noticeDismissTimer = null
-    if (noticeHovered) return
-    dismissActiveNotice()
-  }, NOTICE_DURATION_MS)
+/** 定时收回:working 常驻不排计时(由 syncStickyWorkingNotice 收回),其余按时长 */
+function scheduleNoticeDismiss(notice: IslandNotice): void {
+  cancelNoticeDismiss(notice.id)
+  if (notice.kind === 'working') return
+  const duration =
+    notice.kind === 'completed' || notice.kind === 'error' ? NOTICE_DURATION_LONG_MS : NOTICE_DURATION_MS
+  const timer = window.setTimeout(() => {
+    noticeDismissTimers.delete(notice.id)
+    if (hoveredNoticeIds.has(notice.id)) return
+    dismissNotice(notice.id)
+  }, duration)
+  noticeDismissTimers.set(notice.id, timer)
 }
 
-function dismissActiveNotice(): void {
-  cancelNoticeDismiss()
-  // 重置悬停标志:换新气泡后浏览器不一定重发 mouseenter,靠它防「永不收回」的卡死
-  noticeHovered = false
-  activeNotice.value = null
-  advanceNotice()
+/** 关闭单条气泡并尝试用队列补位 */
+function dismissNotice(id: number): void {
+  cancelNoticeDismiss(id)
+  // 清悬停标记:换新气泡后浏览器不一定重发 mouseenter,靠它防「永不收回」的卡死
+  hoveredNoticeIds.delete(id)
+  activeNotices.value = activeNotices.value.filter((item) => item.id !== id)
+  fillNoticeSlots()
 }
 
-/** 出队并展示下一条;不满足展示条件(非收起态/折叠中/关闭气泡)时留在队列里等时机 */
-function advanceNotice(): void {
-  if (activeNotice.value !== null) return
+/** 清空全部气泡、计时器与队列(切通知方式/折叠/卸载前) */
+function clearAllNotices(): void {
+  for (const id of [...noticeDismissTimers.keys()]) {
+    cancelNoticeDismiss(id)
+  }
+  hoveredNoticeIds.clear()
+  activeNotices.value = []
+  noticeQueue.value = []
+}
+
+/** 出队填补空位;不满足展示条件(非收起态/折叠中/关闭气泡)时留在队列里等时机 */
+function fillNoticeSlots(): void {
   if (notificationMode.value === 'system') return
   if (mode.value !== 'pill' || dockEdge.value !== null || manualHidden.value) return
-  const { queue, notice } = dequeueNotice(noticeQueue.value)
-  noticeQueue.value = queue
-  if (notice === null) return
-  activeNotice.value = notice
-  scheduleNoticeDismiss()
+  while (activeNotices.value.length < MAX_ACTIVE_NOTICES && noticeQueue.value.length > 0) {
+    const { queue, notice } = dequeueNotice(noticeQueue.value)
+    noticeQueue.value = queue
+    if (notice === null) break
+    activeNotices.value = [...activeNotices.value, notice]
+    scheduleNoticeDismiss(notice)
+  }
+}
+
+/**
+ * 常驻 working 气泡的收回检查:其 Agent 已离开执行态(状态变化/清扫降级/被移除)
+ * 时立即收回并尝试补位。
+ */
+function syncStickyWorkingNotice(): void {
+  const staleIds = activeNotices.value
+    .filter((notice) => notice.kind === 'working' && notice.agentId !== undefined)
+    .filter((notice) => {
+      const agent = agentList.value.find((item) => item.id === notice.agentId)
+      return agent === undefined || agent.state !== 'working'
+    })
+    .map((notice) => notice.id)
+  if (staleIds.length === 0) return
+  activeNotices.value = activeNotices.value.filter((notice) => !staleIds.includes(notice.id))
+  for (const id of staleIds) {
+    cancelNoticeDismiss(id)
+    hoveredNoticeIds.delete(id)
+  }
+  fillNoticeSlots()
 }
 
 async function safeWindowVisible(): Promise<boolean> {
@@ -537,15 +598,21 @@ async function safeWindowVisible(): Promise<boolean> {
  * 岛内气泡:窗口可见且未折叠时入队展示(展开态排队,收起后弹出);
  * 岛不可见(全屏隐藏/托盘隐藏/贴顶折叠)或选择系统通知时走 Windows 通知。
  */
-async function notifyUser(kind: NoticeKind, title: string, detail: string = ''): Promise<void> {
+async function notifyUser(kind: NoticeKind, title: string, detail: string = '', agentId?: string): Promise<void> {
   const preferBubble = notificationMode.value !== 'system'
   const preferSystem = notificationMode.value === 'system' || notificationMode.value === 'both'
   let bubbled = false
   if (preferBubble) {
     const windowVisible = await safeWindowVisible()
     if (windowVisible && !manualHidden.value && dockEdge.value === null) {
-      noticeQueue.value = enqueueNotice(noticeQueue.value, kind, title, detail)
-      advanceNotice()
+      noticeQueue.value = enqueueNotice(noticeQueue.value, kind, title, detail, Date.now(), agentId)
+      // 满位且来的是更高优先级事件(waiting/error)时,挤掉最早一条常驻 working 让位;
+      // 有空位则直接并排展示
+      if (activeNotices.value.length >= MAX_ACTIVE_NOTICES && (kind === 'waiting' || kind === 'error')) {
+        const victim = activeNotices.value.find((notice) => notice.kind === 'working')
+        if (victim !== undefined) dismissNotice(victim.id)
+      }
+      fillNoticeSlots()
       bubbled = true
     }
   }
@@ -554,25 +621,25 @@ async function notifyUser(kind: NoticeKind, title: string, detail: string = ''):
   }
 }
 
-/** 气泡悬停:暂停收回计时,并取消悬停展开计时(正在读气泡,别突然展开面板) */
-function handleNoticeEnter(): void {
-  noticeHovered = true
+/** 气泡悬停:暂停该条的收回计时,并取消悬停展开计时(正在读气泡,别突然展开面板) */
+function handleNoticeEnter(id: number): void {
+  hoveredNoticeIds.add(id)
   cancelExpand()
-  cancelNoticeDismiss()
+  cancelNoticeDismiss(id)
 }
 
-function handleNoticeLeave(): void {
-  noticeHovered = false
-  if (activeNotice.value !== null) {
-    scheduleNoticeDismiss()
+function handleNoticeLeave(id: number): void {
+  hoveredNoticeIds.delete(id)
+  const notice = activeNotices.value.find((item) => item.id === id)
+  if (notice !== undefined) {
+    scheduleNoticeDismiss(notice)
   }
 }
 
-/** 点击气泡:关掉气泡并跳到对应模块的展开面板 */
-async function handleNoticeClick(): Promise<void> {
-  const kind = activeNotice.value?.kind
-  dismissActiveNotice()
-  if (kind === 'info') {
+/** 点击气泡:关掉该气泡并跳到对应模块的展开面板 */
+async function handleNoticeClick(notice: IslandNotice): Promise<void> {
+  dismissNotice(notice.id)
+  if (notice.kind === 'info') {
     if (activeModule.value !== 'pomodoro') await handleSwitchModule('pomodoro')
   } else {
     // waiting/completed/error/reset 都属于用量模块的信息
@@ -585,8 +652,7 @@ async function handleNotificationMode(next: NotificationMode): Promise<void> {
   notificationMode.value = next
   if (next === 'system') {
     // 切到系统通知:清掉岛内积压,避免残留旧气泡
-    noticeQueue.value = []
-    if (activeNotice.value !== null) dismissActiveNotice()
+    clearAllNotices()
   }
   try {
     await saveNotificationMode(next)
@@ -595,10 +661,13 @@ async function handleNotificationMode(next: NotificationMode): Promise<void> {
   }
 }
 
-// 气泡出现/消失:药丸态窗口就地加高/回落(锚定左上角,向下生长)
-watch(activeNotice, () => {
-  void applyPillModeSize()
-})
+// 气泡数量变化:药丸态窗口就地加高/回落(锚定左上角,向下生长)
+watch(
+  () => activeNotices.value.length,
+  () => {
+    void applyPillModeSize()
+  },
+)
 
 async function applyPillModeSize(): Promise<void> {
   if (mode.value !== 'pill' || dockEdge.value !== null) return
@@ -810,6 +879,7 @@ onBeforeUnmount(() => {
   cancelCollapse()
   cancelDock()
   cancelBlurClose()
+  clearAllNotices()
   flushSaveClipboard()
   poller.stop()
   unlistenTray?.()
@@ -836,7 +906,7 @@ async function enterMode(target: IslandMode): Promise<void> {
   mode.value = target
   // 回收起态时先尝试出队气泡,让 pillModeSize 一次算对高度
   if (target === 'pill') {
-    advanceNotice()
+    fillNoticeSlots()
   }
   const size = target === 'settings' ? SETTINGS_SIZE : target === 'expanded' ? expandedSize() : pillModeSize()
   const anchor = await resizeInPlace(size)
@@ -1008,8 +1078,8 @@ async function dockNow(): Promise<void> {
   if (mode.value !== 'pill' || dockEdge.value !== null || manualHidden.value) return
   // 折叠态不支持气泡:先收掉气泡并把窗口回落到基础药丸尺寸,
   // 否则折叠判定以加高后的矩形计算,唤回时也会带着多余高度
-  if (activeNotice.value !== null) {
-    dismissActiveNotice()
+  if (activeNotices.value.length > 0) {
+    clearAllNotices()
     await applyPillModeSize()
   }
   const win = getCurrentWindow()
@@ -1093,7 +1163,7 @@ async function handleDockRestore(): Promise<void> {
   cancelDock()
   await undock()
   // 折叠期间消息走的是系统通知,这里恢复气泡通道,处理残余队列
-  advanceNotice()
+  fillNoticeSlots()
 }
 
 // ===== 窗口出屏守卫(轮询版) =====
@@ -1425,15 +1495,18 @@ const panelEvents = computed<Record<string, unknown>>(() => {
         @wheel="handlePillWheel"
       />
     </Transition>
-    <!-- 岛内气泡:药丸下方垂落,仅收起态出现;悬停暂停收回,点击跳对应模块 -->
-    <NoticeBubble
-      v-if="dockEdge === null && activeNotice !== null"
-      :notice="activeNotice"
-      @mouseenter="handleNoticeEnter"
-      @mouseleave="handleNoticeLeave"
-      @click="handleNoticeClick"
-      @close="dismissActiveNotice"
-    />
+    <!-- 岛内气泡:药丸下方垂落,最多两条并排;悬停暂停收回,点击跳对应模块 -->
+    <div v-if="dockEdge === null && activeNotices.length > 0" class="notice-stack">
+      <NoticeBubble
+        v-for="notice in activeNotices"
+        :key="notice.id"
+        :notice="notice"
+        @mouseenter="handleNoticeEnter(notice.id)"
+        @mouseleave="handleNoticeLeave(notice.id)"
+        @click="handleNoticeClick(notice)"
+        @close="dismissNotice(notice.id)"
+      />
+    </div>
   </div>
 
   <!-- 展开态:注册表动态挂载面板;Tab 切换,滚轮切模块,模块特有事件由 panelEvents 组装 -->
@@ -1661,6 +1734,18 @@ html[data-theme='light'][data-skin='cyber'] {
   height: 100vh;
   /* 气泡以绝对定位垂挂在药丸下方,壳层是它的定位上下文 */
   position: relative;
+}
+
+/* 气泡堆叠容器:首条距药丸 8px,多条依次向下,最多两条 */
+.notice-stack {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10;
 }
 
 /* ===== 药丸基座(全局):用量/番茄两种药丸共用的容器外观 ===== */

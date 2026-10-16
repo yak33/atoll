@@ -6,7 +6,7 @@
  * @author ZHANGCHAO 2026/10/15
  */
 
-export type NoticeKind = 'waiting' | 'completed' | 'error' | 'reset' | 'info'
+export type NoticeKind = 'working' | 'waiting' | 'completed' | 'error' | 'reset' | 'info'
 
 export interface IslandNotice {
   id: number
@@ -14,6 +14,8 @@ export interface IslandNotice {
   title: string
   detail: string
   at: number
+  /** 关联 Agent(working 常驻气泡用它判断何时收回:该 Agent 离开执行态即收回) */
+  agentId?: string
 }
 
 /** 队列上限:突发消息挤掉最旧的,避免长时间连环弹出 */
@@ -27,20 +29,21 @@ export const NOTICE_TTL_MS = 15_000
 
 let nextId = 1
 
-/** 入队:去重 + 上限淘汰(丢最旧),返回新队列 */
+/** 入队:去重 + 上限淘汰(丢最旧),返回新队列;agentId 供 working 常驻气泡做收回判定 */
 export function enqueueNotice(
   queue: IslandNotice[],
   kind: NoticeKind,
   title: string,
   detail: string,
   now: number = Date.now(),
+  agentId?: string,
 ): IslandNotice[] {
   const duplicated = queue.some(
     (item) => item.kind === kind && item.title === title && now - item.at < DEDUPE_MS,
   )
   if (duplicated) return queue
 
-  const next = [...queue, { id: nextId++, kind, title, detail, at: now }]
+  const next = [...queue, { id: nextId++, kind, title, detail, at: now, agentId }]
   return next.length > MAX_QUEUE ? next.slice(next.length - MAX_QUEUE) : next
 }
 

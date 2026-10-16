@@ -8,7 +8,7 @@
 
 智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.3.1-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.3.2-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -16,7 +16,7 @@
 
 [English](./README_EN.md) &nbsp;|&nbsp; [简体中文](./README.md)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.3.1)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.3.2)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -29,7 +29,7 @@
 
 **atoll** 是一款专为 Windows 桌面打造的现代「灵动岛」悬浮组件。平时只是一颗 260 × 44 像素的极简胶囊，钉在屏幕顶部边缘：
 - **额度还剩多少，瞟一眼就知道**：告别频繁切网页查额度，滚动窗口、倒计时与限额告警尽收眼底。
-- **Agent 干活它在盯**：ZCode / Claude Code / Antigravity / Qoder / DeepSeek Harness 在执行、在等你确认还是干完了，药丸状态点与岛内气泡一目了然。
+- **Agent 干活它在盯**：ZCode / Claude Code / Antigravity / Qoder / Trae / DeepSeek Harness 在执行、在等你确认还是干完了，药丸状态点与岛内气泡一目了然。
 - **克制且不打扰**：不占任务栏、不抢焦点、全屏游戏与视频毫秒级隐身、拖到哪就停在哪。
 
 ---
@@ -53,7 +53,7 @@
 - **面板活跃区**：展开面板顶部实时列出各 Agent 状态（图标、名称、状态、最近更新），等待确认优先置顶；条目按生命周期自动清理（完成 5 分钟、异常 30 分钟自动消失），无需手动维护。
 - **岛内气泡通知**：Agent 开始执行 / 等待确认 / 任务完成时，气泡从药丸下方垂落——执行中气泡**常驻显示**至状态变化（转等待、完成或断流即收回），完成与异常停留 8 秒，其余约 4 秒自动收回；同时最多两条并排（多 Agent 各自可见），其余排队。悬停暂停倒计时，点击直达对应面板。岛被隐藏或贴顶折叠时自动回退 Windows 系统通知，通知方式（岛内气泡 / 系统通知 / 两者）在设置中三选一。
 - **气泡微剧场**：每条气泡随机抽取一套主题色（8 色）与一种火柴人小动效（快跑 / 敲键盘 / 蹦跳 / 搬砖挥锤），同一条气泡生命周期内保持稳定；主题色高光带定期从左往右流过胶囊表面（流光溢彩），文案超宽自动跑马灯滚动。
-- **伴生插件生态**：仓库 `plugins/` 内置 ZCode、Claude Code、Antigravity、Qoder（含国内版 Qoder CN）与 DeepSeek Harness 五款宿主的伴生插件。Agent 通过本地回环 HTTP 桥（`127.0.0.1:41799`，仅本机可达、无 CORS）实时上报工作状态；ZCode 用 `process` 型 hook 调 `curl.exe`，Claude Code 用原生 `http` 型 hook 宿主直发，Antigravity 与 Qoder 走官方 hooks（`command` 型 curl 桥），DeepSeek Harness 为 Cordis 插件进程内 `fetch`——全程绕开 shell 引号转义。
+- **伴生插件生态**：仓库 `plugins/` 内置 ZCode、Claude Code、Antigravity、Qoder（含国内版 Qoder CN）、Trae（含国内版 Trae CN）与 DeepSeek Harness 六款宿主的伴生插件。Agent 通过本地回环 HTTP 桥（`127.0.0.1:41799`，仅本机可达、无 CORS）实时上报工作状态；ZCode 用 `process` 型 hook 调 `curl.exe`，Claude Code 用原生 `http` 型 hook 宿主直发，Antigravity、Qoder 与 Trae 走官方 hooks（`command` 型 curl 桥），DeepSeek Harness 为 Cordis 插件进程内 `fetch`——全程绕开 shell 引号转义。
 - **断流自愈**：hook 丢失或 Agent 崩溃时，执行中状态超过 10 分钟自动降级为「状态不明」，不会永远假装在工作；等待确认超过 60 分钟降级处理，防止永久跳动。
 
 ### 3. 番茄钟专注模块
@@ -103,7 +103,7 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.3.1_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.3.2_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
 3. 打开后悬停顶部药丸展开面板，点右上角 ⚙ 进入设置，在用量页粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
 
@@ -138,7 +138,7 @@ atoll/
 │   ├── islandModules.ts # 模块注册表: 挂载/滚轮环形切换/尺寸/Tab 全由它驱动
 │   └── App.vue          # 三态状态机、全局 CSS 变量、偶发流光系统与切屏容器
 ├── src-tauri/           # Rust 壳层: 窗口控制 / 系统托盘 / 全屏探测 / 剪贴板监听 / Agent 状态接收端(127.0.0.1:41799 回环) / 开机自启
-├── plugins/             # Agent 伴生插件: zcode-bridge(process hook) / claude-bridge(http hook) / antigravity-bridge(官方 hooks) / qoder-bridge(官方 hooks) / deepseek-bridge(Cordis 插件)
+├── plugins/             # Agent 伴生插件: zcode-bridge(process hook) / claude-bridge(http hook) / antigravity-bridge(官方 hooks) / qoder-bridge(官方 hooks) / trae-bridge(官方 hooks) / deepseek-bridge(Cordis 插件)
 └── site/                # Vercel 静态落地页 (HTML/CSS/JS 零构建)
 ```
 

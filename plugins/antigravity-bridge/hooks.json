@@ -1,0 +1,72 @@
+{
+  "atoll-bridge": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=antigravity&name=Antigravity&state=idle\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=antigravity&name=Antigravity&state=working\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostInvocation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=antigravity&name=Antigravity&state=working\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=antigravity&name=Antigravity&state=working\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ask_question|ask_permission",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=antigravity&name=Antigravity&state=waiting\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=antigravity&name=Antigravity&state=completed\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

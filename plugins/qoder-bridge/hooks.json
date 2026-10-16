@@ -1,0 +1,53 @@
+{
+  "UserPromptSubmit": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=qoder&name=Qoder&state=working\""
+        }
+      ]
+    }
+  ],
+  "PreToolUse": [
+    {
+      "matcher": "ask_user_question",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=qoder&name=Qoder&state=waiting\""
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=qoder&name=Qoder&state=working\""
+        }
+      ]
+    }
+  ],
+  "PostToolUseFailure": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=qoder&name=Qoder&state=working\""
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=qoder&name=Qoder&state=completed\""
+        }
+      ]
+    }
+  ]
+}

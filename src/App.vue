@@ -444,7 +444,7 @@ function handleUpdateAgentStatus(payload: AgentStatusPayload): void {
 
   // 开始执行按变更沿触发(与 completed 同策略):工具调用的心跳上报不会重复弹气泡
   if (nextState === 'working' && prevState !== 'working') {
-    void notifyUser('working', `${displayName} 正在努力工作中...`, payload.task || '', agentId)
+    void notifyUser('working', `${displayName} 正在努力干活中...`, payload.task || '', agentId)
   }
   // waiting 不去重:每次权限请求都是新的打扰,都值得提醒;
   // completed 只在状态变更沿上提醒,重复推送不重响
@@ -506,9 +506,9 @@ const hoveredNoticeIds = new Set<number>()
 /** 各气泡独立的自动收回计时器,按通知 id 索引 */
 const noticeDismissTimers = new Map<number, number>()
 /** 短停留:waiting / reset / info */
-const NOTICE_DURATION_MS = 4000
+const NOTICE_DURATION_MS = 15000
 /** 长停留:completed / error(值得多看一眼) */
-const NOTICE_DURATION_LONG_MS = 8000
+const NOTICE_DURATION_LONG_MS = 30000
 
 function cancelNoticeDismiss(id: number): void {
   const timer = noticeDismissTimers.get(id)

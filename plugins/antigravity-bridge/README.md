@@ -30,7 +30,7 @@
 
 ## 验证
 
-在 Antigravity 里随便发个任务,atoll 灵动岛药丸右端应出现青蓝声呐点、气泡「Antigravity 正在努力工作中...」;Agent 向你提问时变琥珀等待。
+在 Antigravity 里随便发个任务,atoll 灵动岛药丸右端应出现青蓝声呐点、气泡「Antigravity 正在努力干活中...」;Agent 向你提问时变琥珀等待。
 
 手动验证端点:
 

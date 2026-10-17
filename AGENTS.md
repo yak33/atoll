@@ -43,7 +43,7 @@ Windows 桌面灵动岛悬浮组件(Tauri 2 + Vue 3 + TS)。首个模块:智谱 
 npm run dev           # 仅前端(Vite,浏览器预览,无窗口行为)
 npm run tauri dev     # 完整开发模式(真实窗口)
 npm run build         # 前端类型检查 + 构建(交付前最低验证)
-npm test              # vitest 单测(adapter 解析规则)
+npm test              # vitest 单测(adapter 解析/agentHub/notifyQueue/pomodoro 等 core 层)
 cargo test --lib      # Rust 侧单测(在 src-tauri 下;agent_server 解码函数)
 npm run tauri build   # 桌面安装包打包
 ```

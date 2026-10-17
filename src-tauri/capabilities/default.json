@@ -23,7 +23,8 @@
       "identifier": "http:default",
       "allow": [
         { "url": "https://open.bigmodel.cn/*" },
-        { "url": "https://api.z.ai/*" }
+        { "url": "https://api.z.ai/*" },
+        { "url": "https://api.deepseek.com/*" }
       ]
     }
   ]

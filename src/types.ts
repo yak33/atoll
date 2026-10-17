@@ -47,3 +47,28 @@ export class QuotaError extends Error {
     this.name = 'QuotaError'
   }
 }
+
+/**
+ * DeepSeek 开放平台余额(GET /user/balance)。
+ * 金额保留上游十进制字符串:展示与格式化在 core/balance 里做,避免浮点误差进入持久化数据。
+ */
+export interface DeepSeekBalanceInfo {
+  /** 币种。官方当前为 CNY / USD,这里不硬编码成联合类型:上游新增币种时仍能展示,不至于整块解析失败 */
+  currency: string
+  /** 总的可用余额,包括赠金和充值余额 */
+  totalBalance: string
+  /** 未过期的赠金余额 */
+  grantedBalance: string
+  /** 充值余额 */
+  toppedUpBalance: string
+}
+
+/** DeepSeek 余额快照:一次接口调用返回账号下所有币种的钱包余额 */
+export interface DeepSeekBalanceSnapshot {
+  /** 当前账户是否有余额可供 API 调用(上游字段语义) */
+  isAvailable: boolean
+  /** 按币种分条;账号没有任何余额时为空数组 */
+  balances: DeepSeekBalanceInfo[]
+  /** 快照落地时刻(RFC3339),UI 用它计算「数据过期 X 分钟」 */
+  fetchedAt: string
+}

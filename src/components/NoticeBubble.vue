@@ -229,14 +229,16 @@ watch(
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <g class="runner-body-bob">
-          <circle cx="14" cy="4.2" r="2" />
-          <line x1="13" y1="6.8" x2="11" y2="13" />
+        <g class="runner-bob">
+          <g class="runner-lean">
+            <circle cx="14" cy="4.4" r="2" />
+            <line x1="13.4" y1="7" x2="11.2" y2="12.8" />
+            <g class="runner-arm-f"><path d="M13.2 8.2 L15.8 10.6 L17.9 9.1" /></g>
+            <g class="runner-arm-b"><path d="M13.2 8.2 L10.4 10.2 L8.2 9.4" /></g>
+            <g class="runner-leg-f"><path d="M11.2 12.8 L14.6 16.2 L16.8 19.8" /></g>
+            <g class="runner-leg-b"><path d="M11.2 12.8 L8 15.6 L6.2 19.2" /></g>
+          </g>
         </g>
-        <g class="runner-arm-b"><path d="M13 8 L10.5 10.5 L8 9.5" /></g>
-        <g class="runner-leg-b"><path d="M11 13 L8 16 L6.5 19.5" /></g>
-        <g class="runner-leg-f"><path d="M11 13 L14 16.5 L17 19.5" /></g>
-        <g class="runner-arm-f"><path d="M13 8 L15.5 10.5 L18 9" /></g>
       </svg>
 
       <!-- 2. 疯狂敲键盘小人:专注俯身,双臂高频交替敲击笔记本,屏幕光点闪动 -->
@@ -250,13 +252,13 @@ watch(
         stroke-linejoin="round"
       >
         <line x1="12" y1="18" x2="20" y2="18" stroke-width="1.8" />
-        <line x1="18.5" y1="18" x2="19.8" y2="12" stroke-width="1.8" />
+        <line x1="18.6" y1="18" x2="19.6" y2="12" stroke-width="1.8" />
         <circle class="typer-spark" cx="17" cy="14" r="1.1" fill="currentColor" />
         <circle class="typer-head" cx="7.5" cy="7" r="2" />
         <path d="M7.5 9.2 L8.5 15" />
         <path d="M8.5 15 L5.5 17.5 L4 21" />
-        <g class="typer-arm-1"><path d="M8 11.5 L11.5 14.5 L14.5 17.5" /></g>
-        <g class="typer-arm-2"><path d="M8 11.5 L12.5 13.5 L16.5 17.5" /></g>
+        <g class="typer-arm-1"><path d="M8 11.5 L11.2 14.8 L14.2 17.2" /></g>
+        <g class="typer-arm-2"><path d="M8 11.5 L12.2 13.8 L16.2 17.2" /></g>
       </svg>
 
       <!-- 3. 欢快蹦跳小人:下蹲蓄力、腾空雀跃、高举双臂欢呼 -->
@@ -289,16 +291,22 @@ watch(
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <rect x="15" y="16.5" width="6" height="4.5" rx="1" stroke-width="1.6" fill="currentColor" fill-opacity="0.2" />
-        <circle class="builder-spark" cx="16" cy="16" r="1.2" fill="currentColor" />
-        <circle cx="8" cy="6" r="2.1" />
-        <line x1="8" y1="8.3" x2="9" y2="14.5" />
-        <path d="M9 14.5 L7 18 L6 21.5" />
-        <path d="M9 14.5 L12 18 L13.5 21.5" />
-        <path d="M8.5 10 L6 13 L7.5 16" />
-        <g class="builder-arm">
-          <path d="M8.5 10 L13 10 L16 8" />
-          <line x1="14.5" y1="5.5" x2="17.5" y2="10.5" stroke-width="3" stroke-linecap="square" />
+        <g class="builder-scene">
+          <g class="builder-anvil">
+            <rect x="15" y="16.5" width="6" height="4.5" rx="1" stroke-width="1.6" fill="currentColor" fill-opacity="0.2" />
+          </g>
+          <circle class="builder-spark" cx="16" cy="16" r="1.2" fill="currentColor" />
+          <g class="builder-body">
+            <circle cx="8" cy="6" r="2.1" />
+            <line x1="8" y1="8.3" x2="9" y2="14.5" />
+            <path d="M9 14.5 L7 18 L6 21.5" />
+            <path d="M9 14.5 L12 18 L13.5 21.5" />
+            <path d="M8.5 10 L6 13 L7.5 16" />
+          </g>
+          <g class="builder-arm">
+            <path d="M8.5 10 L13 10 L16 8" />
+            <line x1="14.5" y1="5.5" x2="17.5" y2="10.5" stroke-width="3" stroke-linecap="square" />
+          </g>
         </g>
       </svg>
     </span>
@@ -365,8 +373,8 @@ watch(
 }
 
 /* 流光溢彩:当条气泡主题色的斜向高光带从左往右扫过胶囊表面,扫完停一拍再来。
-   颜色用 color-mix 从 --theme-color 派生(每条气泡随机主题色各流各的);
-   裁在胶囊圆角内不出界,内容层抬到流光之上避免糊文字 */
+   用 transform 平移高光层而不是 background-position:后者每帧重绘整颗气泡,
+   会连带拖慢里面的火柴人动画(合成器动画只动图层位置,成本低得多)。 */
 .notice-bubble::before {
   content: '';
   position: absolute;
@@ -375,19 +383,18 @@ watch(
   pointer-events: none;
   background: linear-gradient(
     115deg,
-    transparent 30%,
-    color-mix(in srgb, var(--theme-color, rgb(56 189 248)) 45%, transparent) 42%,
+    transparent 40%,
+    color-mix(in srgb, var(--theme-color, rgb(56 189 248)) 45%, transparent) 46%,
     rgba(255, 255, 255, 0.5) 50%,
-    color-mix(in srgb, var(--theme-color, rgb(56 189 248)) 45%, transparent) 58%,
-    transparent 78%
+    color-mix(in srgb, var(--theme-color, rgb(56 189 248)) 45%, transparent) 54%,
+    transparent 60%
   );
-  background-size: 250% 100%;
-  background-repeat: no-repeat;
+  transform: translateX(-140%);
   opacity: 0;
   animation: bubble-sheen 3.6s ease-in-out 0.5s infinite;
 }
 
-/* 内容抬到流光之上:图标/文字/关闭钮不被高光带糊到 */
+/* 内容抬到流光/微光之上:图标/文字/关闭钮不被高光带糊到 */
 .bubble-icon,
 .bubble-body,
 .bubble-close {
@@ -397,22 +404,63 @@ watch(
 
 @keyframes bubble-sheen {
   0% {
-    background-position: -130% 0;
+    transform: translateX(-140%);
     opacity: 0;
   }
-  8% {
+  7% {
     opacity: 1;
   }
-  48% {
+  45% {
     opacity: 1;
   }
-  55% {
-    background-position: 130% 0;
+  52% {
+    transform: translateX(140%);
     opacity: 0;
   }
   100% {
-    background-position: 130% 0;
+    transform: translateX(140%);
     opacity: 0;
+  }
+}
+
+/* working/waiting 的呼吸微光:固定 inset 阴影放在伪元素上、只动画 opacity。
+   直接动画 box-shadow 会每帧重绘整颗胶囊,是这排动效里最贵的开销 */
+.notice-bubble::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.bubble-working::after {
+  box-shadow: inset 0 0 14px var(--theme-glow, rgba(56, 189, 248, 0.22));
+  animation: bubble-glow 2.4s ease-in-out 0.45s infinite;
+}
+
+.bubble-waiting::after {
+  box-shadow: inset 0 0 14px rgba(245, 158, 11, 0.3);
+  animation: bubble-glow-waiting 1.6s ease-in-out 0.45s infinite;
+}
+
+@keyframes bubble-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes bubble-glow-waiting {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.9;
   }
 }
 
@@ -434,75 +482,89 @@ watch(
   height: 17px;
 }
 
-/* ================= 1. RUNNER 快跑动效 ================= */
-.runner-body-bob {
-  animation: runner-bob 0.5s ease-in-out infinite;
+/* 显式声明 SVG 变换参考框:不同 Chromium 版本对 transform-origin 的默认参考系处理有差异,
+   统一按 viewBox 坐标解释,关节旋转点才不会在高 DPI 下漂移 */
+.bubble-stickman :is(g, circle) {
+  transform-box: view-box;
 }
-.runner-arm-f {
-  transform-origin: 13px 8px;
-  animation: runner-arm-front 0.5s ease-in-out infinite;
+
+/* ================= 1. RUNNER 快跑动效 ================= */
+/* 起伏组包住四肢:躯干上下浮动时四肢跟随,不会出现"身体动了、腿留在原地"的脱节感 */
+.runner-bob {
+  transform-origin: 12px 21px;
+  animation: runner-bob 0.66s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+.runner-lean {
+  transform-origin: 12px 21px;
+  transform: rotate(-6deg);
+}
+.runner-arm-f,
+.runner-arm-b {
+  transform-origin: 13.2px 8.2px;
+  animation: runner-arm 0.66s ease-in-out infinite;
 }
 .runner-arm-b {
-  transform-origin: 13px 8px;
-  animation: runner-arm-back 0.5s ease-in-out infinite;
+  animation-name: runner-arm-opp;
 }
-.runner-leg-f {
-  transform-origin: 11px 13px;
-  animation: runner-leg-front 0.5s ease-in-out infinite;
+.runner-leg-f,
+.runner-leg-b {
+  transform-origin: 11.2px 12.8px;
+  animation: runner-leg 0.66s ease-in-out infinite;
 }
 .runner-leg-b {
-  transform-origin: 11px 13px;
-  animation: runner-leg-back 0.5s ease-in-out infinite;
+  animation-name: runner-leg-opp;
 }
+/* 一个步态周期两条弹跳(每步一次),手臂与同侧腿反相摆动 */
 @keyframes runner-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-1.4px); }
+  0%, 50%, 100% { transform: translateY(0); }
+  25%, 75% { transform: translateY(-1.5px); }
 }
-@keyframes runner-arm-front {
-  0%, 100% { transform: rotate(32deg); }
-  50% { transform: rotate(-32deg); }
+@keyframes runner-arm {
+  0%, 100% { transform: rotate(28deg); }
+  50% { transform: rotate(-30deg); }
 }
-@keyframes runner-arm-back {
-  0%, 100% { transform: rotate(-32deg); }
+@keyframes runner-arm-opp {
+  0%, 100% { transform: rotate(-30deg); }
+  50% { transform: rotate(28deg); }
+}
+@keyframes runner-leg {
+  0%, 100% { transform: rotate(-30deg); }
   50% { transform: rotate(32deg); }
 }
-@keyframes runner-leg-front {
-  0%, 100% { transform: rotate(-30deg); }
-  50% { transform: rotate(30deg); }
-}
-@keyframes runner-leg-back {
-  0%, 100% { transform: rotate(30deg); }
+@keyframes runner-leg-opp {
+  0%, 100% { transform: rotate(32deg); }
   50% { transform: rotate(-30deg); }
 }
 
 /* ================= 2. TYPER 敲键盘动效 ================= */
-.typer-arm-1 {
-  transform-origin: 8px 11.5px;
-  animation: typer-tap-1 0.2s ease-in-out infinite alternate;
-}
+/* 手腕只做小幅下压交替,不做大摆幅甩动——17px 下大角度会像"乱挥",小幅度更像在打字 */
+.typer-arm-1,
 .typer-arm-2 {
   transform-origin: 8px 11.5px;
-  animation: typer-tap-2 0.2s ease-in-out 0.1s infinite alternate;
+  animation: typer-tap-a 0.18s ease-in-out infinite alternate;
+}
+.typer-arm-2 {
+  animation-name: typer-tap-b;
 }
 .typer-head {
-  transform-origin: 7.5px 7px;
-  animation: typer-nod 0.4s ease-in-out infinite;
+  transform-origin: 7.5px 9px;
+  animation: typer-nod 0.36s ease-in-out infinite;
 }
 .typer-spark {
   transform-origin: 17px 14px;
-  animation: typer-blink 0.3s steps(2, start) infinite;
+  animation: typer-blink 0.24s steps(2, start) infinite;
 }
-@keyframes typer-tap-1 {
-  0% { transform: rotate(-7deg); }
-  100% { transform: rotate(8deg); }
+@keyframes typer-tap-a {
+  from { transform: rotate(-4deg) translateY(0.2px); }
+  to { transform: rotate(3deg) translateY(0.8px); }
 }
-@keyframes typer-tap-2 {
-  0% { transform: rotate(8deg); }
-  100% { transform: rotate(-7deg); }
+@keyframes typer-tap-b {
+  from { transform: rotate(3deg) translateY(0.8px); }
+  to { transform: rotate(-4deg) translateY(0.2px); }
 }
 @keyframes typer-nod {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(0.8px); }
+  50% { transform: translateY(0.7px); }
 }
 @keyframes typer-blink {
   0% { opacity: 0.2; transform: scale(0.6); }
@@ -510,54 +572,83 @@ watch(
 }
 
 /* ================= 3. JUMPER 欢快跳跃动效 ================= */
+/* 完整动作链:下蹲蓄力 → 蹬地 → 腾空 → 落地缓冲 → 小幅回弹,避免只有原地上下飘 */
 .jumper-root {
   transform-origin: 12px 22px;
-  animation: jumper-bounce 0.75s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  animation: jumper-bounce 0.9s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
 }
 .jumper-arm-l {
   transform-origin: 12px 10px;
-  animation: jumper-wave-l 0.75s ease-in-out infinite;
+  animation: jumper-wave-l 0.9s ease-in-out infinite;
 }
 .jumper-arm-r {
   transform-origin: 12px 10px;
-  animation: jumper-wave-r 0.75s ease-in-out infinite;
+  animation: jumper-wave-r 0.9s ease-in-out infinite;
 }
 @keyframes jumper-bounce {
   0%, 100% { transform: translateY(0) scale(1, 1); }
-  18% { transform: translateY(1.8px) scale(1.14, 0.86); }
-  45% { transform: translateY(-4px) scale(0.9, 1.14); }
-  70% { transform: translateY(-1.2px) scale(0.96, 1.04); }
-  85% { transform: translateY(0.8px) scale(1.06, 0.94); }
+  12% { transform: translateY(1.6px) scale(1.12, 0.88); }
+  20% { transform: translateY(-0.8px) scale(0.96, 1.05); }
+  45% { transform: translateY(-4.2px) scale(0.92, 1.08); }
+  62% { transform: translateY(0.8px) scale(1.1, 0.9); }
+  76% { transform: translateY(-0.5px) scale(0.98, 1.02); }
+  88% { transform: translateY(0.1px) scale(1.01, 0.99); }
 }
 @keyframes jumper-wave-l {
-  0%, 100% { transform: rotate(0deg); }
-  45% { transform: rotate(-18deg); }
+  0%, 100% { transform: rotate(-4deg); }
+  20% { transform: rotate(-34deg); }
+  45% { transform: rotate(-52deg); }
+  62% { transform: rotate(-16deg); }
+  76% { transform: rotate(-38deg); }
 }
 @keyframes jumper-wave-r {
-  0%, 100% { transform: rotate(0deg); }
-  45% { transform: rotate(18deg); }
+  0%, 100% { transform: rotate(4deg); }
+  20% { transform: rotate(34deg); }
+  45% { transform: rotate(52deg); }
+  62% { transform: rotate(16deg); }
+  76% { transform: rotate(38deg); }
 }
 
 /* ================= 4. BUILDER 挥锤工匠动效 ================= */
+/* 蓄力慢、落锤快、回弹带余韵;身体与砧台在命中瞬间各下沉半像素做受力反馈 */
+.builder-body {
+  transform-origin: 12px 21px;
+  animation: builder-squat 0.72s ease-out infinite;
+}
 .builder-arm {
   transform-origin: 8.5px 10px;
-  animation: hammer-swing 0.65s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  animation: hammer-swing 0.72s infinite;
+}
+.builder-anvil {
+  transform-origin: 18px 21px;
+  animation: anvil-shake 0.72s ease-out infinite;
 }
 .builder-spark {
   transform-origin: 16px 16px;
-  animation: hammer-spark 0.65s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  animation: hammer-spark 0.72s ease-out infinite;
 }
 @keyframes hammer-swing {
-  0% { transform: rotate(-45deg); }
-  34% { transform: rotate(18deg); }
-  45% { transform: rotate(8deg); }
-  60% { transform: rotate(10deg); }
-  100% { transform: rotate(-45deg); }
+  0% { transform: rotate(-46deg); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  18% { transform: rotate(-54deg); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+  30% { transform: rotate(16deg); animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1); }
+  40% { transform: rotate(4deg); animation-timing-function: ease-in-out; }
+  58% { transform: rotate(8deg); }
+  100% { transform: rotate(-46deg); }
+}
+@keyframes builder-squat {
+  0%, 26%, 100% { transform: translateY(0); }
+  31% { transform: translateY(0.6px); }
+  45% { transform: translateY(0); }
+}
+@keyframes anvil-shake {
+  0%, 28%, 100% { transform: translateY(0); }
+  31% { transform: translateY(0.5px); }
+  36% { transform: translateY(0); }
 }
 @keyframes hammer-spark {
-  0%, 30% { opacity: 0; transform: scale(0); }
-  34% { opacity: 1; transform: scale(1.5); }
-  50% { opacity: 0; transform: scale(0.3); }
+  0%, 29% { opacity: 0; transform: scale(0.2); }
+  31% { opacity: 1; transform: scale(1.6); }
+  42% { opacity: 0; transform: scale(0.6); }
   100% { opacity: 0; }
 }
 
@@ -630,16 +721,12 @@ watch(
 .bubble-working {
   border-color: var(--theme-border, rgba(56, 189, 248, 0.45));
   background: linear-gradient(135deg, var(--bg-surface) 60%, var(--theme-bg, rgba(56, 189, 248, 0.08)) 100%);
-  animation:
-    bubble-in 0.4s var(--ease-spring) both,
-    bubble-glow-working 2.4s ease-in-out 0.45s infinite;
+  animation: bubble-in 0.4s var(--ease-spring) both;
 }
 
 .bubble-waiting {
   border-color: rgba(245, 158, 11, 0.6);
-  animation:
-    bubble-in 0.4s var(--ease-spring) both,
-    bubble-glow-waiting 1.6s ease-in-out 0.45s infinite;
+  animation: bubble-in 0.4s var(--ease-spring) both;
 }
 
 .bubble-completed {
@@ -657,26 +744,6 @@ watch(
   box-shadow: var(--pill-shadow), inset 0 0 12px rgba(56, 189, 248, 0.12);
 }
 
-@keyframes bubble-glow-working {
-  0%,
-  100% {
-    box-shadow: var(--pill-shadow), inset 0 0 6px var(--theme-glow, rgba(56, 189, 248, 0.12));
-  }
-  50% {
-    box-shadow: var(--pill-shadow), inset 0 0 16px var(--theme-glow, rgba(56, 189, 248, 0.28));
-  }
-}
-
-@keyframes bubble-glow-waiting {
-  0%,
-  100% {
-    box-shadow: var(--pill-shadow), inset 0 0 6px rgba(245, 158, 11, 0.12);
-  }
-  50% {
-    box-shadow: var(--pill-shadow), inset 0 0 16px rgba(245, 158, 11, 0.38);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .notice-bubble,
   .bubble-working,
@@ -689,6 +756,11 @@ watch(
   .notice-bubble::before {
     animation: none !important;
     opacity: 0;
+  }
+
+  .notice-bubble::after {
+    animation: none !important;
+    opacity: 0.45;
   }
 }
 </style>

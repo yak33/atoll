@@ -6,7 +6,7 @@
  *
  * @author ZHANGCHAO 2026/10/01
  */
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart'
 import {
   loadAppearance,
@@ -37,16 +37,34 @@ import {
   type UsageAlerts,
 } from '../core/appSettings'
 import { setThemeMode, setSkin, SKIN_OPTIONS } from '../core/theme'
+import { normalizeDeepSeekSettings, type BalanceCurrency, type DeepSeekSettings } from '../core/balance'
+import {
+  moveModule,
+  toggleModuleHidden,
+  visibleModules,
+  type ModuleLayout,
+} from '../core/moduleLayout'
+import { ISLAND_MODULES } from '../islandModules'
 import type { ZhipuCredential } from '../adapters/zhipu'
+import type { DeepSeekCredential } from '../adapters/deepseek'
 
 const props = defineProps<{
   initial: ZhipuCredential | null
   /** 当前激活模块:决定设置面板初始落在哪个 Tab(仅初始,切换不影响药丸模块) */
   activeModule: IslandModule
+  /** DeepSeek 余额模块当前凭据(官方只有一个 API Key) */
+  deepseekInitial: DeepSeekCredential | null
+  /** DeepSeek 余额模块显示设置(币种 + 低余额阈值) */
+  deepseekSettings: DeepSeekSettings
+  /** 模块布局:可见性 + 排序(容器持久化,这里只读并回抛变更) */
+  moduleLayout: ModuleLayout
 }>()
 
 const emit = defineEmits<{
   save: [credential: ZhipuCredential]
+  deepseekSave: [credential: DeepSeekCredential]
+  deepseekSettingsChange: [settings: DeepSeekSettings]
+  moduleLayoutChange: [layout: ModuleLayout]
   appearance: [settings: AppearanceSettings]
   pomoDurations: [settings: PomodoroSettings]
   usageAlerts: [settings: UsageAlerts]
@@ -206,6 +224,28 @@ async function commitAppearance(): Promise<void> {
 // 模块设置 Tab:初始跟随当前激活模块,面板内切换不影响药丸
 const settingsTab = ref<IslandModule>('usage')
 
+// ===== 模块布局:Tab 跟随可见列表;「模块」管理区读写布局 =====
+
+/** 模块 id → 注册表显示名(管理区与 Tab 共用) */
+const MODULE_LABELS: Record<IslandModule, string> = Object.fromEntries(
+  ISLAND_MODULES.map((m) => [m.id, m.label]),
+) as Record<IslandModule, string>
+
+const visibleTabIds = computed<IslandModule[]>(() => visibleModules(props.moduleLayout))
+
+// 布局变化后当前 Tab 可能已被隐藏:回落第一个可见模块
+watch(visibleTabIds, (ids) => {
+  if (!ids.includes(settingsTab.value)) settingsTab.value = ids[0]
+})
+
+function handleToggleModule(id: IslandModule): void {
+  emit('moduleLayoutChange', toggleModuleHidden(props.moduleLayout, id))
+}
+
+function handleMoveModule(id: IslandModule, offset: -1 | 1): void {
+  emit('moduleLayoutChange', moveModule(props.moduleLayout, id, offset))
+}
+
 // 番茄钟时长(分钟):拖动实时 emit(未运行时药丸立即变化),松手落盘
 const pomoCfg = ref<PomodoroSettings>({ ...DEFAULT_POMODORO })
 
@@ -335,11 +375,69 @@ function commitCredential(): void {
   savedAtText.value = '已自动保存'
 }
 
+// ===== DeepSeek 余额设置 =====
+
+/** 币种选项:官方余额接口目前只返回 CNY / USD */
+const DS_CURRENCY_OPTIONS: BalanceCurrency[] = ['CNY', 'USD']
+const dsCurrency = ref<BalanceCurrency>(props.deepseekSettings.currency)
+const dsWarnBelow = ref(props.deepseekSettings.warnBelow)
+const dsCriticalBelow = ref(props.deepseekSettings.criticalBelow)
+
+/** 币种/阈值变更即时生效并落盘;normalize 保证 critical 不高于 warn */
+function commitDeepSeekSettings(): void {
+  const normalized = normalizeDeepSeekSettings({
+    currency: dsCurrency.value,
+    warnBelow: dsWarnBelow.value,
+    criticalBelow: dsCriticalBelow.value,
+  })
+  dsCurrency.value = normalized.currency
+  dsWarnBelow.value = normalized.warnBelow
+  dsCriticalBelow.value = normalized.criticalBelow
+  emit('deepseekSettingsChange', normalized)
+}
+
+/** DeepSeek API Key:与智谱同样走 800ms 防抖自动保存,无保存按钮 */
+const dsApiKey = ref(props.deepseekInitial?.apiKey ?? '')
+const dsSavedAtText = ref('')
+let dsSaveTimer: number | null = null
+let dsDirty = false
+let dsLastSavedJson = JSON.stringify({ apiKey: dsApiKey.value })
+
+watch(dsApiKey, () => {
+  dsDirty = true
+  if (dsSaveTimer !== null) clearTimeout(dsSaveTimer)
+  dsSaveTimer = window.setTimeout(commitDeepSeekCredential, AUTOSAVE_DELAY_MS)
+})
+
+function commitDeepSeekCredential(): void {
+  dsSaveTimer = null
+  if (!dsDirty) return
+  dsDirty = false
+
+  if (dsApiKey.value.trim() === '') {
+    dsSavedAtText.value = 'API Key 为空,当前输入未保存'
+    return
+  }
+  const credential: DeepSeekCredential = { apiKey: dsApiKey.value.trim() }
+  const json = JSON.stringify(credential)
+  if (json === dsLastSavedJson) {
+    dsSavedAtText.value = ''
+    return
+  }
+  dsLastSavedJson = json
+  emit('deepseekSave', credential)
+  dsSavedAtText.value = '已自动保存'
+}
+
 // 关闭面板时冲刷未落盘的输入,防抖窗口内的改动不丢
 onBeforeUnmount(() => {
   if (saveTimer !== null) {
     clearTimeout(saveTimer)
     commitCredential()
+  }
+  if (dsSaveTimer !== null) {
+    clearTimeout(dsSaveTimer)
+    commitDeepSeekCredential()
   }
 })
 </script>
@@ -357,9 +455,15 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="module-tabs">
-      <button :class="['tab-btn', settingsTab === 'usage' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'usage'">用量</button>
-      <button :class="['tab-btn', settingsTab === 'pomodoro' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'pomodoro'">番茄</button>
-      <button :class="['tab-btn', settingsTab === 'clipboard' ? 'tab-btn-active' : '']" type="button" @click="settingsTab = 'clipboard'">剪贴</button>
+      <button
+        v-for="id in visibleTabIds"
+        :key="id"
+        :class="['tab-btn', settingsTab === id ? 'tab-btn-active' : '']"
+        type="button"
+        @click="settingsTab = id"
+      >
+        {{ MODULE_LABELS[id] }}
+      </button>
     </div>
 
     <!-- ===== 用量模块设置 ===== -->
@@ -469,7 +573,93 @@ onBeforeUnmount(() => {
       <button class="reset-pos-btn" type="button" @click="emit('clipboardClear')">清空全部历史(含置顶)</button>
     </template>
 
-    <!-- ===== 公共区:外观 / 胶囊 / 系统 ===== -->
+    <!-- ===== DeepSeek 余额模块设置 ===== -->
+    <template v-else-if="settingsTab === 'deepseek'">
+      <label class="field">
+        <span class="field-label">API Key *</span>
+        <input v-model="dsApiKey" type="password" class="input" placeholder="DeepSeek 开放平台 API Key" autocomplete="off" />
+      </label>
+
+      <div class="field-label">显示币种</div>
+      <div class="theme-row">
+        <button
+          v-for="option in DS_CURRENCY_OPTIONS"
+          :key="option"
+          :class="['theme-btn', dsCurrency === option ? 'theme-btn-active' : '']"
+          type="button"
+          @click="dsCurrency = option; commitDeepSeekSettings()"
+        >
+          {{ option }}
+        </button>
+      </div>
+
+      <div class="section-title">低余额提醒(主币种金额)</div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">琥珀提醒</span>
+          <span class="slider-value">≤ {{ dsWarnBelow }}</span>
+        </div>
+        <input
+          v-model.number="dsWarnBelow"
+          type="range"
+          class="slider"
+          min="0"
+          max="500"
+          step="5"
+          @change="commitDeepSeekSettings"
+        />
+      </div>
+      <div class="slider-field">
+        <div class="slider-head">
+          <span class="field-label">红色提醒</span>
+          <span class="slider-value">≤ {{ dsCriticalBelow }}</span>
+        </div>
+        <input
+          v-model.number="dsCriticalBelow"
+          type="range"
+          class="slider"
+          min="0"
+          :max="dsWarnBelow"
+          step="1"
+          @change="commitDeepSeekSettings"
+        />
+      </div>
+
+      <div v-if="dsSavedAtText !== ''" class="autosave-status">{{ dsSavedAtText }}</div>
+    </template>
+
+    <!-- ===== 公共区:模块 / 外观 / 胶囊 / 系统 ===== -->
+    <div class="section-title">模块</div>
+    <div v-for="(id, index) in moduleLayout.order" :key="id" class="module-row">
+      <span class="module-row-order">
+        <button
+          class="module-move-btn"
+          type="button"
+          :disabled="index === 0"
+          title="上移"
+          @click="handleMoveModule(id, -1)"
+        >↑</button>
+        <button
+          class="module-move-btn"
+          type="button"
+          :disabled="index === moduleLayout.order.length - 1"
+          title="下移"
+          @click="handleMoveModule(id, 1)"
+        >↓</button>
+      </span>
+      <span class="module-row-label">{{ MODULE_LABELS[id] }}</span>
+      <label class="toggle-row" title="至少保留一个可见模块">
+        <input
+          :checked="!moduleLayout.hidden.includes(id)"
+          :disabled="!moduleLayout.hidden.includes(id) && visibleTabIds.length <= 1"
+          type="checkbox"
+          class="checkbox"
+          @change="handleToggleModule(id)"
+        />
+        <span class="field-label">显示</span>
+      </label>
+    </div>
+
     <div class="section-title">外观</div>
     <div class="theme-row">
       <button
@@ -923,6 +1113,47 @@ onBeforeUnmount(() => {
 }
 
 .reset-pos-btn:hover {
+  color: var(--text-primary);
+}
+
+/* 模块管理行:排序按钮 + 名称 + 显示开关 */
+.module-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.module-row-order {
+  display: flex;
+  gap: 3px;
+}
+
+.module-move-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.module-move-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.module-move-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.module-row-label {
+  flex: 1;
+  font-size: 11px;
   color: var(--text-primary);
 }
 

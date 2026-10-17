@@ -12,17 +12,22 @@
  *
  * @author ZHANGCHAO 2026/09/30
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, provide, ref, watch, watchEffect } from 'vue'
 import { getCurrentWindow, currentMonitor, availableMonitors, primaryMonitor, LogicalSize, PhysicalPosition } from '@tauri-apps/api/window'
 import { listen } from '@tauri-apps/api/event'
 import { QuotaPoller } from './core/QuotaPoller'
+import { BalancePoller } from './core/BalancePoller'
 import {
   loadAppearance,
   loadActiveModule,
   loadClipboardEnabled,
   loadClipboardHistory,
   loadCredential,
+  loadDeepSeekBalanceHistory,
+  loadDeepSeekCredential,
+  loadDeepSeekSettings,
   loadDockFoldEnabled,
+  loadModuleLayout,
   loadNotificationMode,
   loadTrayVisible,
   loadExpandDelayMs,
@@ -35,7 +40,11 @@ import {
   saveClipboardEnabled,
   saveClipboardHistory,
   saveCredential,
+  saveDeepSeekBalanceHistory,
+  saveDeepSeekCredential,
+  saveDeepSeekSettings,
   saveDockFoldEnabled,
+  saveModuleLayout,
   saveNotificationMode,
   saveTrayVisible,
   saveExpandDelayMs,
@@ -57,6 +66,20 @@ import {
   type NoticeKind,
 } from './core/notifyQueue'
 import { estimateHoursToLimit, formatBurnEstimate, type BurnSample } from './core/burnRate'
+import { normalizeModuleLayout, visibleModules, type ModuleLayout } from './core/moduleLayout'
+import {
+  appendBalancePoint,
+  balanceLevel,
+  estimateBalanceDays,
+  formatBalanceAmount,
+  formatBalanceEstimate,
+  normalizeDeepSeekSettings,
+  pickBalance,
+  DEFAULT_DEEPSEEK_SETTINGS,
+  type BalanceLevel,
+  type BalancePoint,
+  type DeepSeekSettings,
+} from './core/balance'
 import {
   appendHistory,
   type UsageHistoryPoint,
@@ -107,7 +130,15 @@ import { playSound } from './core/sound'
 import MiniIsland from './components/MiniIsland.vue'
 import NoticeBubble from './components/NoticeBubble.vue'
 import type { ZhipuCredential } from './adapters/zhipu'
-import type { QuotaError, QuotaErrorKind, UsageWindow, ZhipuQuotaSnapshot } from './types'
+import type { DeepSeekCredential } from './adapters/deepseek'
+import type {
+  DeepSeekBalanceInfo,
+  DeepSeekBalanceSnapshot,
+  QuotaError,
+  QuotaErrorKind,
+  UsageWindow,
+  ZhipuQuotaSnapshot,
+} from './types'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { ISLAND_MODULES } from './islandModules'
 
@@ -165,10 +196,41 @@ const appearance = ref<AppearanceSettings>({ ...DEFAULT_APPEARANCE })
 // ===== 模块层:注册表驱动,收起态滚轮环形切换,选择持久化 =====
 const activeModule = ref<IslandModule>('usage')
 
-/** 当前模块的注册表定义;存储里的非法值兜底到第一个模块 */
+// 模块布局(用户自定义显示/隐藏与排序):默认注册表顺序全可见,onMounted 时从 store 覆盖
+const moduleLayout = ref<ModuleLayout>(normalizeModuleLayout(null, ISLAND_MODULES.map((m) => m.id)))
+/** 可见模块序列:滚轮环形顺序、面板 Tab、设置 Tab 三处共用 */
+const visibleModuleIds = computed<IslandModule[]>(() => visibleModules(moduleLayout.value))
+
+/** 当前模块的注册表定义;非法值/被隐藏的模块兜底到第一个可见模块 */
 const moduleDef = computed(
-  () => ISLAND_MODULES.find((m) => m.id === activeModule.value) ?? ISLAND_MODULES[0],
+  () =>
+    ISLAND_MODULES.find((m) => m.id === activeModule.value) ??
+    ISLAND_MODULES.find((m) => visibleModuleIds.value.includes(m.id)) ??
+    ISLAND_MODULES[0],
 )
+
+/**
+ * 面板顶部的模块 Tab 列表经 provide 下发,ModuleTabs inject 消费——
+ * 避免四个面板组件各加一个透传 prop;未 provide 时(单测/浏览器预览)回落完整注册表。
+ */
+provide(
+  'visibleModuleTabs',
+  computed(() => ISLAND_MODULES.filter((m) => visibleModuleIds.value.includes(m.id))),
+)
+
+/** 设置面板改布局:落盘;当前模块被隐藏时切到第一个可见模块 */
+async function handleModuleLayoutChange(next: ModuleLayout): Promise<void> {
+  moduleLayout.value = next
+  const visible = visibleModules(next)
+  if (!visible.includes(activeModule.value)) {
+    await handleSwitchModule(visible[0])
+  }
+  try {
+    await saveModuleLayout(next)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
 
 async function handleSwitchModule(next: IslandModule): Promise<void> {
   if (next === activeModule.value) return
@@ -201,11 +263,13 @@ function handlePillWheel(event?: WheelEvent): void {
   } else {
     wheelDirection.value = 'down'
   }
-  const len = ISLAND_MODULES.length
-  const idx = ISLAND_MODULES.findIndex((m) => m.id === activeModule.value)
+  // 环形序列只含可见模块;隐藏的模块滚轮跳过,不占一格
+  const cycle = visibleModuleIds.value
+  const len = cycle.length
+  const idx = cycle.indexOf(activeModule.value)
   if (idx === -1 || len < 2) return
   const nextIdx = wheelDirection.value === 'down' ? (idx + 1) % len : (idx - 1 + len) % len
-  void handleSwitchModule(ISLAND_MODULES[nextIdx].id)
+  void handleSwitchModule(cycle[nextIdx])
 }
 
 /**
@@ -405,6 +469,70 @@ async function handleClipboardEnabled(next: boolean): Promise<void> {
     // 持久化失败不影响本次会话生效
   }
 }
+
+// ===== DeepSeek 余额模块 =====
+// 独立于智谱额度链路:自己的凭据、设置、趋势历史与轮询器,两边互不影响。
+const dsSettings = ref<DeepSeekSettings>({ ...DEFAULT_DEEPSEEK_SETTINGS })
+const dsCredential = ref<DeepSeekCredential | null>(null)
+const dsSnapshot = ref<DeepSeekBalanceSnapshot | null>(null)
+const dsError = ref<QuotaError | null>(null)
+const dsRefreshing = ref(false)
+const dsHistory = ref<Record<string, BalancePoint[]>>({})
+const dsBurnEstimate = ref('')
+
+/** 主币种余额:配置币种不存在时回落账号第一币种(账号只有一种币种是常态) */
+const dsBalance = computed<DeepSeekBalanceInfo | null>(() =>
+  pickBalance(dsSnapshot.value?.balances ?? [], dsSettings.value.currency),
+)
+const dsTotal = computed<number>(() => {
+  const total = dsBalance.value === null ? Number.NaN : Number(dsBalance.value.totalBalance)
+  return Number.isFinite(total) ? total : 0
+})
+const dsLevel = computed<BalanceLevel>(() => {
+  // 没有余额数据时不参与分级,避免「未配置/加载中」被当成低余额
+  if (dsBalance.value === null) return 'normal'
+  return balanceLevel(dsTotal.value, {
+    warnBelow: dsSettings.value.warnBelow,
+    criticalBelow: dsSettings.value.criticalBelow,
+  })
+})
+const dsAvailable = computed<boolean>(() => dsSnapshot.value?.isAvailable ?? false)
+const dsFetchedAgoText = computed<string>(() => {
+  if (dsSnapshot.value === null) return ''
+  const minutes = Math.floor((nowTick.value - Date.parse(dsSnapshot.value.fetchedAt)) / 60000)
+  return minutes < 1 ? '刚刚' : `${minutes} 分钟前`
+})
+
+/**
+ * 余额轮询:10 分钟一次(余额变化慢,同为只读查询)。
+ * 每次把账号下所有币种各记一条趋势样本——不同币种不可相加,必须分开存。
+ */
+const dsPoller = new BalancePoller({
+  onData: (data) => {
+    dsSnapshot.value = data
+    dsError.value = null
+    const sampledAt = Date.now()
+    const nextHistory: Record<string, BalancePoint[]> = { ...dsHistory.value }
+    for (const info of data.balances) {
+      const total = Number(info.totalBalance)
+      if (!Number.isFinite(total)) continue
+      const key = info.currency.toUpperCase()
+      nextHistory[key] = appendBalancePoint(nextHistory[key] ?? [], { at: sampledAt, total })
+    }
+    dsHistory.value = nextHistory
+    void saveDeepSeekBalanceHistory(nextHistory)
+    const primary = pickBalance(data.balances, dsSettings.value.currency)
+    dsBurnEstimate.value =
+      primary === null
+        ? ''
+        : formatBalanceEstimate(
+            estimateBalanceDays(nextHistory[primary.currency.toUpperCase()] ?? [], sampledAt),
+          )
+  },
+  onError: (error) => {
+    dsError.value = error
+  },
+})
 
 // ===== 智能体监控状态(已合并进用量模块:药丸状态点 + 用量面板顶部活跃区) =====
 const agentList = ref<AgentItem[]>([])
@@ -758,7 +886,12 @@ onMounted(async () => {
     await handleTrayVisible(false)
   }
   appearance.value = await loadAppearance()
+  moduleLayout.value = await loadModuleLayout(ISLAND_MODULES.map((m) => m.id))
   activeModule.value = await loadActiveModule()
+  // 持久化的激活模块可能已被用户隐藏(或已下线的模块):回落第一个可见模块
+  if (!visibleModuleIds.value.includes(activeModule.value)) {
+    activeModule.value = visibleModuleIds.value[0]
+  }
   // 番茄钟时长从持久化配置初始化
   const pomoCfg = await loadPomodoro()
   pomo.value = initialPomodoro(pomoCfg.workMin * 60_000, pomoCfg.breakMin * 60_000)
@@ -774,9 +907,15 @@ onMounted(async () => {
   applyOpacityVar()
   await applyInitialLayout(pillSize(), savedPos !== null ? new PhysicalPosition(savedPos.x, savedPos.y) : null)
   credential.value = await loadCredential()
+  dsSettings.value = await loadDeepSeekSettings()
+  dsHistory.value = await loadDeepSeekBalanceHistory()
+  dsCredential.value = await loadDeepSeekCredential()
   booting.value = false
   if (credential.value !== null) {
     poller.start(credential.value)
+  }
+  if (dsCredential.value !== null) {
+    dsPoller.start(dsCredential.value)
   }
 
   // 托盘「显示/隐藏」:可见性统一由前端管理,与全屏自动隐藏互不打架
@@ -882,6 +1021,7 @@ onBeforeUnmount(() => {
   clearAllNotices()
   flushSaveClipboard()
   poller.stop()
+  dsPoller.stop()
   unlistenTray?.()
   unlistenTrayHidden?.()
   unlistenTraySettings?.()
@@ -1314,6 +1454,43 @@ async function handleRefresh(): Promise<void> {
   }
 }
 
+/** DeepSeek 设置面板自动保存:落盘 + 重启轮询(Key 变更后清空旧快照与速率样本) */
+async function handleDeepSeekSave(next: DeepSeekCredential): Promise<void> {
+  await saveDeepSeekCredential(next)
+  dsCredential.value = next
+  dsSnapshot.value = null
+  dsError.value = null
+  dsBurnEstimate.value = ''
+  dsPoller.start(next)
+}
+
+/** DeepSeek 显示设置(币种/低余额阈值):即时生效并落盘 */
+async function handleDeepSeekSettings(next: DeepSeekSettings): Promise<void> {
+  const normalized = normalizeDeepSeekSettings(next)
+  dsSettings.value = normalized
+  const primary = dsBalance.value
+  if (primary !== null) {
+    dsBurnEstimate.value = formatBalanceEstimate(
+      estimateBalanceDays(dsHistory.value[primary.currency.toUpperCase()] ?? [], Date.now()),
+    )
+  }
+  try {
+    await saveDeepSeekSettings(normalized)
+  } catch {
+    // 持久化失败不影响本次会话生效
+  }
+}
+
+async function handleDeepSeekRefresh(): Promise<void> {
+  if (dsCredential.value === null || dsRefreshing.value) return
+  dsRefreshing.value = true
+  try {
+    await dsPoller.refresh()
+  } finally {
+    dsRefreshing.value = false
+  }
+}
+
 // ===== 展示派生 =====
 
 const ERROR_SHORT: Record<QuotaErrorKind, string> = {
@@ -1358,6 +1535,36 @@ const tooltipText = computed<string>(() => {
   return parts.join('\n') || '点击打开设置'
 })
 
+// DeepSeek 余额的占位/悬浮文案:与智谱一样按「有无凭据 / 有无数据 / 错误」分档
+const dsPlaceholderText = computed<string>(() => {
+  if (booting.value) return '…'
+  if (dsCredential.value === null) return '点此设置'
+  if (dsSnapshot.value === null && dsError.value !== null) return ERROR_SHORT[dsError.value.kind]
+  if (dsSnapshot.value === null) return '加载中…'
+  if (dsBalance.value === null) return '无余额数据'
+  return ''
+})
+
+const dsTooltipText = computed<string>(() => {
+  const parts: string[] = []
+  const balance = dsBalance.value
+  if (balance !== null) {
+    parts.push(`DeepSeek 余额 ${formatBalanceAmount(balance.totalBalance, balance.currency)}`)
+    parts.push(`充值 ${formatBalanceAmount(balance.toppedUpBalance, balance.currency)}`)
+    parts.push(`赠金 ${formatBalanceAmount(balance.grantedBalance, balance.currency)}`)
+    if (dsSnapshot.value !== null && !dsSnapshot.value.isAvailable) parts.push('余额不足,API 调用可能失败')
+    parts.push(`更新于 ${dsFetchedAgoText.value}`)
+  }
+  const others = (dsSnapshot.value?.balances ?? []).filter((item) => item.currency !== balance?.currency)
+  if (others.length > 0) {
+    parts.push(`其他币种:${others.map((item) => formatBalanceAmount(item.totalBalance, item.currency)).join(' / ')}`)
+  }
+  if (dsError.value !== null) {
+    parts.push(`${ERROR_SHORT[dsError.value.kind]}:${dsError.value.message}`)
+  }
+  return parts.join('\n') || '点击打开设置'
+})
+
 // 托盘 Tooltip:Agent 状态时间敏感度最高,有活跃 Agent 时优先显示;
 // 否则按当前模块同步(全屏/隐藏时悬停托盘也能看清实时状态)
 watchEffect(() => {
@@ -1387,6 +1594,17 @@ watchEffect(() => {
     }
   } else if (activeModule.value === 'clipboard') {
     void updateTrayTooltip(`atoll · 📋 剪贴板历史 (${clipboardItems.value.length} 条)`)
+  } else if (activeModule.value === 'deepseek') {
+    const balance = dsBalance.value
+    if (dsCredential.value === null) {
+      void updateTrayTooltip('atoll · 点此配置 DeepSeek Key')
+    } else if (balance !== null) {
+      void updateTrayTooltip(`atoll · DeepSeek ${formatBalanceAmount(balance.totalBalance, balance.currency)}`)
+    } else if (dsError.value !== null) {
+      void updateTrayTooltip(`atoll · DeepSeek 余额 [${ERROR_SHORT[dsError.value.kind] || '异常'}]`)
+    } else {
+      void updateTrayTooltip('atoll · 正在加载 DeepSeek 余额…')
+    }
   }
 })
 
@@ -1406,6 +1624,17 @@ const pillProps = computed<Record<string, unknown>>(() => {
       latest: clipboardItems.value.slice(0, 3),
       enabled: clipboardEnabled.value,
       tooltip: '📋 剪贴板 · 滚轮切换模块',
+      glowEffects: appearance.value.glowEffects,
+    }
+  }
+  if (activeModule.value === 'deepseek') {
+    return {
+      balance: dsBalance.value,
+      text: dsPlaceholderText.value,
+      available: dsAvailable.value,
+      level: dsLevel.value,
+      hasError: dsError.value !== null,
+      tooltip: dsTooltipText.value,
       glowEffects: appearance.value.glowEffects,
     }
   }
@@ -1431,6 +1660,20 @@ const panelProps = computed<Record<string, unknown>>(() => {
   }
   if (activeModule.value === 'clipboard') {
     return { activeModule: activeModule.value, items: clipboardItems.value, enabled: clipboardEnabled.value }
+  }
+  if (activeModule.value === 'deepseek') {
+    return {
+      activeModule: activeModule.value,
+      balance: dsBalance.value,
+      level: dsLevel.value,
+      available: dsAvailable.value,
+      error: dsError.value,
+      fetchedAgo: dsFetchedAgoText.value,
+      refreshing: dsRefreshing.value,
+      burnEstimate: dsBurnEstimate.value,
+      history: dsHistory.value[(dsBalance.value?.currency ?? dsSettings.value.currency).toUpperCase()] ?? [],
+      placeholder: dsPlaceholderText.value,
+    }
   }
   // 用量模块(默认):附活跃 Agent 列表(idle 项已衰减,不值得占位)
   return {
@@ -1462,6 +1705,9 @@ const panelEvents = computed<Record<string, unknown>>(() => {
       pin: handleClipboardPin,
       clear: handleClipboardClear,
     }
+  }
+  if (activeModule.value === 'deepseek') {
+    return { settings: openSettings, refresh: handleDeepSeekRefresh }
   }
   // 用量模块(默认):Agent 活跃区的移除/清空
   return { refresh: handleRefresh, settings: openSettings, removeAgent: handleRemoveAgent, clearAgents: handleClearAgents }
@@ -1527,7 +1773,13 @@ const panelEvents = computed<Record<string, unknown>>(() => {
     v-else
     :initial="credential"
     :active-module="activeModule"
+    :deepseek-initial="dsCredential"
+    :deepseek-settings="dsSettings"
+    :module-layout="moduleLayout"
     @save="handleSave"
+    @deepseek-save="handleDeepSeekSave"
+    @deepseek-settings-change="handleDeepSeekSettings"
+    @module-layout-change="handleModuleLayoutChange"
     @close="closeSettings"
     @appearance="handleAppearance"
     @pomo-durations="handlePomoDurations"

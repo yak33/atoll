@@ -7,22 +7,30 @@
  */
 import { load } from '@tauri-apps/plugin-store'
 import type { ZhipuCredential } from '../adapters/zhipu'
+import type { DeepSeekCredential } from '../adapters/deepseek'
 import type { UsageHistoryPoint } from './usageHistory'
 import type { ClipboardItem } from './clipboardHistory'
+import {
+  DEFAULT_DEEPSEEK_SETTINGS,
+  normalizeDeepSeekSettings,
+  type BalancePoint,
+  type DeepSeekSettings,
+} from './balance'
+import { normalizeModuleLayout, type ModuleLayout } from './moduleLayout'
 
 const STORE_FILE = 'settings.json'
 const CREDENTIAL_KEY = 'zhipu_credential'
 const THEME_KEY = 'theme'
 const ACTIVE_MODULE_KEY = 'active_module'
 
-/** 当前激活的灵动岛模块:用量监控 / 番茄钟 / 剪贴板 */
-export type IslandModule = 'usage' | 'pomodoro' | 'clipboard'
+/** 当前激活的灵动岛模块:用量监控 / 番茄钟 / 剪贴板 / DeepSeek 余额 */
+export type IslandModule = 'usage' | 'pomodoro' | 'clipboard' | 'deepseek'
 
 export async function loadActiveModule(): Promise<IslandModule> {
   try {
     const store = await getStore()
     const value = await store.get<IslandModule>(ACTIVE_MODULE_KEY)
-    if (value === 'usage' || value === 'pomodoro' || value === 'clipboard') return value
+    if (value === 'usage' || value === 'pomodoro' || value === 'clipboard' || value === 'deepseek') return value
   } catch {
     // 读取失败回落用量监控
   }
@@ -32,6 +40,30 @@ export async function loadActiveModule(): Promise<IslandModule> {
 export async function saveActiveModule(module: IslandModule): Promise<void> {
   const store = await getStore()
   await store.set(ACTIVE_MODULE_KEY, module)
+  await store.save()
+}
+
+// ===== 模块布局:用户自定义的显示/隐藏与排序 =====
+
+const MODULE_LAYOUT_KEY = 'module_layout'
+
+/**
+ * 读取模块布局;known 传当前注册表的模块 id 列表,
+ * 未知模块剔除、新模块补尾、全隐藏重置等规整见 core/moduleLayout 的单测。
+ */
+export async function loadModuleLayout(known: readonly IslandModule[]): Promise<ModuleLayout> {
+  try {
+    const store = await getStore()
+    return normalizeModuleLayout(await store.get<unknown>(MODULE_LAYOUT_KEY), known)
+  } catch {
+    // 读取失败回落注册表默认顺序全可见
+    return normalizeModuleLayout(null, known)
+  }
+}
+
+export async function saveModuleLayout(layout: ModuleLayout): Promise<void> {
+  const store = await getStore()
+  await store.set(MODULE_LAYOUT_KEY, layout)
   await store.save()
 }
 
@@ -457,5 +489,85 @@ export async function savePillPosition(position: PillPosition | null): Promise<v
   } else {
     await store.set(PILL_POSITION_KEY, position)
   }
+  await store.save()
+}
+
+// ===== DeepSeek 余额模块(独立凭据/设置/趋势,不影响智谱那套) =====
+
+const DEEPSEEK_CREDENTIAL_KEY = 'deepseek_credential'
+const DEEPSEEK_SETTINGS_KEY = 'deepseek_settings'
+const DEEPSEEK_BALANCE_HISTORY_KEY = 'deepseek_balance_history'
+
+/** DeepSeek 凭据:只有 API Key(官方无 base_url / 团队版字段) */
+export async function loadDeepSeekCredential(): Promise<DeepSeekCredential | null> {
+  try {
+    const store = await getStore()
+    const value = await store.get<DeepSeekCredential>(DEEPSEEK_CREDENTIAL_KEY)
+    if (value === null || value === undefined) return null
+    // 兼容脏数据:apiKey 缺失或为空视为未配置
+    if (typeof value.apiKey !== 'string' || value.apiKey.trim() === '') return null
+    return { apiKey: value.apiKey.trim() }
+  } catch {
+    // store 打不开按未配置处理,不阻塞 UI
+    return null
+  }
+}
+
+export async function saveDeepSeekCredential(credential: DeepSeekCredential): Promise<void> {
+  const store = await getStore()
+  await store.set(DEEPSEEK_CREDENTIAL_KEY, { apiKey: credential.apiKey.trim() })
+  await store.save()
+}
+
+/** 读取显示币种与低余额阈值;缺字段/越界时逐项钳制/回落默认 */
+export async function loadDeepSeekSettings(): Promise<DeepSeekSettings> {
+  try {
+    const store = await getStore()
+    const raw = await store.get<Partial<DeepSeekSettings>>(DEEPSEEK_SETTINGS_KEY)
+    if (raw !== null && typeof raw === 'object') return normalizeDeepSeekSettings(raw)
+  } catch {
+    // 读取失败回落默认
+  }
+  return { ...DEFAULT_DEEPSEEK_SETTINGS }
+}
+
+export async function saveDeepSeekSettings(settings: DeepSeekSettings): Promise<void> {
+  const store = await getStore()
+  await store.set(DEEPSEEK_SETTINGS_KEY, normalizeDeepSeekSettings(settings))
+  await store.save()
+}
+
+/** 余额趋势序列:按币种各存一条数组(币种之间不可相加) */
+export type DeepSeekBalanceHistory = Record<string, BalancePoint[]>
+
+export async function loadDeepSeekBalanceHistory(): Promise<DeepSeekBalanceHistory> {
+  try {
+    const store = await getStore()
+    const raw = await store.get<Record<string, BalancePoint[]>>(DEEPSEEK_BALANCE_HISTORY_KEY)
+    if (raw !== null && typeof raw === 'object') {
+      const history: DeepSeekBalanceHistory = {}
+      for (const [currency, points] of Object.entries(raw)) {
+        if (!Array.isArray(points)) continue
+        // 逐条过滤脏数据:时间戳与金额都是有限数才保留
+        const valid = points.filter(
+          (point) =>
+            point !== null &&
+            typeof point === 'object' &&
+            Number.isFinite(point.at) &&
+            Number.isFinite(point.total),
+        )
+        if (valid.length > 0) history[currency] = valid
+      }
+      return history
+    }
+  } catch {
+    // 读取失败按无历史处理
+  }
+  return {}
+}
+
+export async function saveDeepSeekBalanceHistory(history: DeepSeekBalanceHistory): Promise<void> {
+  const store = await getStore()
+  await store.set(DEEPSEEK_BALANCE_HISTORY_KEY, history)
   await store.save()
 }

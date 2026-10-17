@@ -16,6 +16,8 @@ import PomodoroPill from './components/PomodoroPill.vue'
 import PomodoroPanel from './components/PomodoroPanel.vue'
 import ClipboardPill from './components/ClipboardPill.vue'
 import ClipboardPanel from './components/ClipboardPanel.vue'
+import DeepSeekPill from './components/DeepSeekPill.vue'
+import DeepSeekPanel from './components/DeepSeekPanel.vue'
 
 export interface IslandModuleDefinition {
   id: IslandModule
@@ -38,6 +40,14 @@ export const ISLAND_MODULES: IslandModuleDefinition[] = [
     panel: ExpandedPanel,
     // 宽度至少 400 且跟随药丸,避免展开反而比药丸窄;高度含 24h 趋势图
     expandedSize: (pillWidth) => new LogicalSize(Math.max(400, pillWidth), 265),
+  },
+  {
+    id: 'deepseek',
+    label: '余额',
+    pill: DeepSeekPill,
+    panel: DeepSeekPanel,
+    // 余额面板:总余额 + 充值/赠金明细 + 24h 趋势,固定中等尺寸
+    expandedSize: (pillWidth) => new LogicalSize(Math.max(340, pillWidth), 290),
   },
   {
     id: 'pomodoro',

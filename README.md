@@ -6,9 +6,9 @@
 
 **钉在 Windows 屏幕顶部的灵动岛悬浮组件**
 
-智谱 GLM Coding Plan 滚动用量监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
+智谱 GLM Coding Plan 滚动用量监控 · DeepSeek 钱包余额监控 · 极简番茄钟 · 剪贴板历史 · 多模块扩展容器
 
-[![Version](https://img.shields.io/badge/version-v0.3.2-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
+[![Version](https://img.shields.io/badge/version-v0.4.0-emerald?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue?style=flat-square)](https://github.com/yak33/atoll/releases)
 [![Tauri](https://img.shields.io/badge/Tauri-2.x-24C8D8?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
@@ -16,7 +16,7 @@
 
 [English](./README_EN.md) &nbsp;|&nbsp; [简体中文](./README.md)
 
-[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.3.2)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
+[🌐 访问官网](https://atoll-site-swart.vercel.app/) &nbsp;|&nbsp; [⬇️ 下载最新版 (v0.4.0)](https://github.com/yak33/atoll/releases/latest) &nbsp;|&nbsp; [📝 版本更新说明](https://github.com/yak33/atoll/releases)
 
 </div>
 
@@ -48,7 +48,13 @@
   - 🔔 **重置提醒**：额度窗口一旦重置，自动发送 Windows Toast 通知。
 - **全场景支持**：适配个人版与团队版（支持配置 `organizationId` 与 `projectId`）；兼容 Token 限额模式与信用额度模式。
 
-### 2. AI Agent 工作状态监控（并入用量模块）
+### 2. DeepSeek 余额监控（可选模块）
+- **钱包余额一眼可见**：接入 DeepSeek 官方开放平台 `GET /user/balance`，药丸展示总可用余额，展开面板分列**充值余额**与**未过期赠金**两行明细；多币种（CNY / USD）按币种独立展示，绝不混加。
+- **趋势与耗尽预估**：每 10 分钟采样一次（随机抖动 + 失败指数退避），面板内嵌 24h 余额 sparkline；检测到充值 / 赠金到账会自动重置消耗基线，不把入账误判成消耗。
+- **低余额分级提醒**：阈值可配（默认琥珀 ≤ ¥20 / 红色 ≤ ¥5），药丸与面板同步转琥珀 / 红；上游 `is_available=false`（余额不足以继续调用 API）时给出红色警示。
+- **只读、纯本地**：只需要一个 DeepSeek 开放平台 API Key，余额查询是只读请求、不消耗 token；Key 与智谱凭据分槽存储，互不覆盖。
+
+### 3. AI Agent 工作状态监控（并入用量模块）
 - **药丸状态点**：任一 Agent 在执行 / 等你确认 / 异常时，用量药丸右端亮起状态点——执行中青蓝声呐涟漪（登场弹跳 + 持续扩散的光环）、等待确认琥珀跳动、异常红色常亮，余光可感知且不打断当前工作。
 - **面板活跃区**：展开面板顶部实时列出各 Agent 状态（图标、名称、状态、最近更新），等待确认优先置顶；条目按生命周期自动清理（完成 5 分钟、异常 30 分钟自动消失），无需手动维护。
 - **岛内气泡通知**：Agent 开始执行 / 等待确认 / 任务完成时，气泡从药丸下方垂落——执行中气泡**常驻显示**至状态变化（转等待、完成或断流即收回），完成与异常停留 30 秒，其余约 15 秒自动收回；同时最多两条并排（多 Agent 各自可见），其余排队。悬停暂停倒计时，点击直达对应面板。岛被隐藏或贴顶折叠时自动回退 Windows 系统通知，通知方式（岛内气泡 / 系统通知 / 两者）在设置中三选一。
@@ -56,23 +62,24 @@
 - **伴生插件生态**：仓库 `plugins/` 内置 ZCode、Claude Code、Antigravity、Qoder（含国内版 Qoder CN）、Trae（含国内版 Trae CN）与 DeepSeek Harness 六款宿主的伴生插件。Agent 通过本地回环 HTTP 桥（`127.0.0.1:41799`，仅本机可达、无 CORS）实时上报工作状态；ZCode 用 `process` 型 hook 调 `curl.exe`，Claude Code 用原生 `http` 型 hook 宿主直发，Antigravity、Qoder 与 Trae 走官方 hooks（`command` 型 curl 桥），DeepSeek Harness 为 Cordis 插件进程内 `fetch`——全程绕开 shell 引号转义。
 - **断流自愈**：hook 丢失或 Agent 崩溃时，执行中状态超过 10 分钟自动降级为「状态不明」，不会永远假装在工作；等待确认超过 60 分钟降级处理，防止永久跳动。
 
-### 3. 番茄钟专注模块
+### 4. 番茄钟专注模块
 - **防休眠跑偏**：基于结束时间戳的精确状态机，系统睡眠唤醒自动冻结并暂停，时间绝不累加跑偏。
 - **双阶段流转**：专注与休息自动切换，阶段完成桌面 Toast 提醒；番茄钟运行中微弱心跳呼吸律动。
 - **随时调节**：工作时长（5~60 分钟）与休息时长自由滑杆配置，下一阶段即时生效。
 
-### 4. 剪贴板历史模块
+### 5. 剪贴板历史模块
 - **事件驱动记录**:Win32 `AddClipboardFormatListener` 消息监听(clipboard-rs),零轮询;支持纯文本与图像(截图/复制图片自动入库,缩略图+悬停预览+点击写回),文件类忽略。
 - **去重置顶**：重复复制同内容不产生冗余条目，原条目自动回到顶部；上限 200 条，置顶条目豁免淘汰。
 - **搜索与一键复制**：即时子串搜索，点击条目复制回剪贴板；支持置顶、删除、清空。
 - **数据只在本机**：不联网不上传；设置中可一键关闭记录或清空历史。
 
-### 5. 6 款调优质感皮肤与 11 种偶发流光
+### 6. 6 款调优质感皮肤与 11 种偶发流光
 - **6 套质感皮肤**：黑曜石（经典翠绿）、深海蓝（科技冰蓝）、极光紫（暗夜霓虹）、赤焰橙（暖意落日）、薄荷绿（清爽森系）、钛金金（哑黑钛金），底壳色调、高光游标与设置面板全局联动。
 - **11 种偶发物理流光**：边框流光、彗星拖尾、双流光、粒子对撞、波纹扩散、双波汇流、声呐涟漪、极光色散、月食金边、斜向扫光、星火微闪，让桌面充满生命力。
 - **深浅自适应**：浅色、深色、跟随 Windows 系统无缝自动切换。
+- **模块自由编排**：滚轮切换的模块可在设置中隐藏 / 显示与上下排序，收起态滚轮、面板 Tab、设置 Tab 三处同步生效；至少保留一个可见模块，将来新增模块自动补位。
 
-### 6. 极致克制的不打扰体验
+### 7. 极致克制的不打扰体验
 - **全屏自动隐藏**：检测到前台窗口全屏（游戏、全屏看片、PPT 演示投屏）灵动岛瞬时隐身，退出全屏自动恢复。
 - **贴顶自动折叠**（默认开，可在设置关闭）：药丸贴住屏幕顶边且静止 3 秒后，隐入为顶边一道 3px 霓虹流光线，移入即恢复完整胶囊；离顶边有间隙则视为有意悬浮，永不折叠。
 - **窗口永不丢失**：拖出屏幕多少都自动弹回完整可见（松手/鼠标离开即触发）；位置记忆带启动安全网。
@@ -95,7 +102,7 @@
 | 状态 | 尺寸 (逻辑像素) | 行为与用途 |
 | :--- | :--- | :--- |
 | **收起态 (Pill)** | `260 × 44` (宽度可自定义) | 常驻屏幕顶部，展示当前最紧张窗口或番茄钟状态。滚轮切模块；悬停或点击展开 |
-| **展开态 (Expanded)** | 用量 `400+ × 265`（Agent 活跃时自动加高）/ 番茄 `280 × 250` / 剪贴 `320 × 380` | 悬停或点击展开：完整进度条、24h 趋势折线、速率预测、Agent 活跃区、剪贴板搜索或番茄控制；列表支持原生平滑滚动；顶部 ⚙ 进入设置 |
+| **展开态 (Expanded)** | 用量 `400+ × 265`（Agent 活跃时自动加高）/ 番茄 `280 × 250` / 剪贴 `320 × 380` / 余额 `340 × 290` | 悬停或点击展开：完整进度条、24h 趋势折线、速率预测、Agent 活跃区、剪贴板搜索、番茄控制或 DeepSeek 余额明细；列表支持原生平滑滚动；顶部 ⚙ 进入设置 |
 | **设置态 (Settings)** | `340 × 700` | 点击打开设置面板，按模块分区配置 API Key、告警阈值、番茄时长、主题皮肤、光效、开机自启 |
 
 ---
@@ -103,11 +110,11 @@
 ## 🚀 快速开始
 
 ### 方式一：下载安装包（推荐）
-1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.3.2_x64-setup.exe`；
+1. 前往 [Releases 页面](https://github.com/yak33/atoll/releases/latest) 下载最新的 `atoll_0.4.0_x64-setup.exe`；
 2. 双击安装（安装到当前用户目录，**无需管理员权限**）；
-3. 打开后悬停顶部药丸展开面板，点右上角 ⚙ 进入设置，在用量页粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）。
+3. 打开后悬停顶部药丸展开面板，点右上角 ⚙ 进入设置，在用量页粘贴您的智谱 API Key（如果是团队版，一并填入组织 ID 即可）；需要监控 DeepSeek 余额时，在「余额」页填入 DeepSeek 开放平台 API Key（与智谱凭据分开保存）。
 
-> 🔒 **隐私声明**：atoll 是零后端的纯桌面应用，您的 API Key 仅存储在本机应用数据目录（明文 JSON，无加密），除直连智谱官方额度接口外，绝不向任何第三方服务器上传任何数据。
+> 🔒 **隐私声明**：atoll 是零后端的纯桌面应用，您的 API Key 仅存储在本机应用数据目录（明文 JSON，无加密），除直连智谱官方额度接口与 DeepSeek 官方余额接口外，绝不向任何第三方服务器上传任何数据。
 
 ---
 
@@ -116,12 +123,14 @@
 ```
 atoll/
 ├── src/
-│   ├── adapters/        # 数据源适配器: zhipu.ts(官方非公开接口解析与集中容错)
+│   ├── adapters/        # 数据源适配器: zhipu.ts(非公开额度接口解析与集中容错) / deepseek.ts(官方余额接口解析,多币种钱包)
 │   ├── core/            # 核心业务逻辑(全部纯函数 + 单测)
 │   │   ├── QuotaPoller.ts       # 轮询调度器: 5分钟轮询 + 随机抖动 + 指数退避
 │   │   ├── pomodoro.ts          # 番茄钟状态机: 基于结束时间戳防漂移
 │   │   ├── usageHistory.ts      # 24h 用量历史: 采样/裁剪/sparkline 坐标计算
 │   │   ├── burnRate.ts          # 消耗速率预测: 相邻快照斜率粗估
+│   │   ├── balance.ts           # DeepSeek 余额: 金额格式化/低余额分级/趋势与速率粗估
+│   │   ├── BalancePoller.ts     # DeepSeek 余额轮询: 10 分钟 + 抖动 + 退避 + 单飞
 │   │   ├── appSettings.ts       # 设置持久化: Tauri Store, 含皮肤/阈值/模块等
 │   │   ├── theme.ts             # 主题与 6 款皮肤切换, 系统深浅实时响应
 │   │   ├── tray.ts              # 系统托盘 Tooltip 实时状态同步
@@ -144,12 +153,13 @@ atoll/
 
 ### 关键设计约定
 - **解析隔离**：所有智谱接口的不确定字段由 [adapters/zhipu.ts](src/adapters/zhipu.ts) 单独封装并由单测覆盖，UI 层只接收标准统一数据模型，严禁专有字段渗入组件。
-- **安全鉴权**：遵循智谱官方协议直接发送裸 API Key（不加 `Bearer` 前缀）。
+- **安全鉴权**：遵循智谱官方协议直接发送裸 API Key（不加 `Bearer` 前缀）；DeepSeek 余额接口则使用标准 `Authorization: Bearer <API Key>`，两套凭据分开存储。
+- **余额模型隔离**：智谱是「窗口百分比」，DeepSeek 是「钱包余额」（总可用 / 充值 / 未过期赠金，多币种）；金额从 adapter 到持久化保留字符串，只有趋势/速率计算才转数字，多币种永不合并。
 - **绿色低耗**：
   - 自动轮询 5 分钟一次 + 随机抖动，失败按 1→10 分钟指数退避，杜绝任何滥刷行为；
   - 安装包大小仅 **~3.08 MiB**；
   - 任务管理器常驻内存仅 **~138 MB**（绝大部分为 Windows WebView2 基础底噪，Tauri 主进程仅 ~30 MB）；
-  - **90 个单元测试全部自动化通过**。
+  - **137 个单元测试全部自动化通过**。
 
 ---
 

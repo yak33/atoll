@@ -1,6 +1,6 @@
 # atoll 伴生插件(Agent 状态桥)
 
-把 ZCode / Claude Code / Antigravity / Qoder / Trae / DeepSeek Harness 的会话状态(执行中 / 等待确认 / 已完成)实时上报给 atoll 灵动岛的「智能体」模块。
+把 ZCode / Claude Code / Antigravity / Qoder / Trae / WorkBuddy / DeepSeek Harness 的会话状态(执行中 / 等待确认 / 已完成)实时上报给 atoll 灵动岛的「智能体」模块。
 
 ## 原理
 
@@ -18,18 +18,19 @@ atoll 桌面端在 `127.0.0.1:41799` 提供两个本地接收端点(仅回环地
 - **atoll-antigravity-bridge**:Google Antigravity 的官方 hooks(仅 `command` 型,shell 字符串)调 `curl.exe`——URL 加双引号即跨 shell 安全,同样不需要 JSON。全局配置装在 `~/.gemini/config/hooks.json`,详见 antigravity-bridge/README.md。
 - **atoll-qoder-bridge**:Qoder(含国内版 Qoder CN)的官方 hooks(同为 `command` 型)调 `curl.exe` 桥接端点。hooks 合并进用户级 `settings.json` 的 `hooks` 键(国际版 `~/.qoder`、国内版 `~/.qoder-cn`),改完需重启 IDE。waiting 信号精确匹配 `ask_user_question` 工具,用户回答后由 `PostToolUse` 自动恢复 working。
 - **atoll-trae-bridge**:Trae(含国内版 Trae CN)的官方 hooks(`command` 型)调 `curl.exe` 桥接端点。hooks 合并进全局 `hooks.json`(国内版 `~/.trae-cn`、国际版 `~/.trae`),对所有项目生效,改完需重启 Trae。waiting 信号走 `Notification` 事件(同 Claude Code 族),用户确认后由 `PostToolUse` 心跳恢复 working,详见 trae-bridge/README.md。
+- **atoll-workbuddy-bridge**:WorkBuddy(腾讯 CodeBuddy)的官方 hooks(**完全兼容 Claude Code 规范**,`command` 型)调 `curl.exe` 桥接端点。hooks 追加合并进 `~/.workbuddy/settings.json`(桌面端主目录;~/.codebuddy 为独立 CLI 一并合并),安装脚本保留其他工具已配的 hooks,改完需重启 WorkBuddy。waiting 信号走 `PermissionRequest` + `Notification` 双事件,详见 workbuddy-bridge/README.md。
 - **atoll-dsh-bridge**:DeepSeek Harness 的 Cordis 插件(bundle),在宿主 Node 进程内直接 `fetch()` 上报,同样零 shell 参与。dsh 侧有精确的 `approval/asked` / `approval/decided` 事件,waiting 态比另外几个宿主更准;事件自带 `session.id`,多会话并发时按「任一 waiting > 任一 working > 最近静止态」聚合,后续按会话分卡零成本。
 
 ## 事件 → 状态映射
 
-| 宿主事件 | ZCode | Claude Code | Antigravity | Qoder | Trae | DeepSeek Harness | atoll 状态 |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|---|
-| 会话启动 | `SessionStart` | `SessionStart` | `SessionStart` | — | `SessionStart` | `session/created` | idle 待命 |
-| 用户提交请求 | `UserPromptSubmit` | `UserPromptSubmit` | `PreInvocation` | `UserPromptSubmit` | `UserPromptSubmit` | `user/message` / `turn/start` | working 执行中 |
-| 模型/工具调用(刷新心跳) | `PostToolUse` | `PostToolUse` | `Invocation` 后 / `PostToolUse` | `PostToolUse` / `PostToolUseFailure` | `PostToolUse` | `step/start` / `tool/call` / `tool/result` | working 执行中 |
-| 请求确认 / 提问 | `PermissionRequest` | `Notification` | `PreToolUse`(ask_question 等) | `PreToolUse`(ask_user_question) | `Notification` | `approval/asked` | waiting 等待确认 |
-| 确认通过(恢复执行) | — | — | — | `PostToolUse`(提问返回) | — | `approval/decided` | working 执行中 |
-| 任务完成 | `Stop` | `Stop` | `Stop` | `Stop` | `Stop` | `turn/end` | completed 已完成 |
+| 宿主事件 | ZCode | Claude Code | Antigravity | Qoder | Trae | WorkBuddy | DeepSeek Harness | atoll 状态 |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
+| 会话启动 | `SessionStart` | `SessionStart` | `SessionStart` | — | `SessionStart` | `SessionStart` | `session/created` | idle 待命 |
+| 用户提交请求 | `UserPromptSubmit` | `UserPromptSubmit` | `PreInvocation` | `UserPromptSubmit` | `UserPromptSubmit` | `UserPromptSubmit` | `user/message` / `turn/start` | working 执行中 |
+| 模型/工具调用(刷新心跳) | `PostToolUse` | `PostToolUse` | `Invocation` 后 / `PostToolUse` | `PostToolUse` / `PostToolUseFailure` | `PostToolUse` | `PostToolUse` | `step/start` / `tool/call` / `tool/result` | working 执行中 |
+| 请求确认 / 提问 | `PermissionRequest` | `Notification` | `PreToolUse`(ask_question 等) | `PreToolUse`(ask_user_question) | `Notification` | `PermissionRequest` | `approval/asked` | waiting 等待确认 |
+| 确认通过(恢复执行) | — | — | — | `PostToolUse`(提问返回) | — | — | `approval/decided` | working 执行中 |
+| 任务完成 | `Stop` | `Stop` | `Stop` | `Stop` | `Stop` | `Stop` | `turn/end` | completed 已完成 |
 
 注:Claude Code 与 Trae 的 `Notification` 同时覆盖「请求授权」和「闲置提醒」两种情况,都可能显示为等待确认。
 
@@ -67,6 +68,15 @@ node scripts/install-trae-bridge.mjs
 
 装完**重启 Trae**。全局配置对所有项目生效;仅单个项目用时,把 `plugins/trae-bridge/hooks.json` 复制为 `$PROJECT/.trae/hooks.json` 即可,详见 trae-bridge/README.md。
 
+### WorkBuddy
+
+```bash
+# 在 atoll 仓库根目录执行:追加合并 hooks 到 ~/.workbuddy 与 ~/.codebuddy 的 settings.json(保留既有第三方 hooks)
+node scripts/install-workbuddy-bridge.mjs
+```
+
+装完**重启 WorkBuddy**。手动合并方式见 workbuddy-bridge/README.md。
+
 ### DeepSeek Harness
 
 ```bash
@@ -91,6 +101,7 @@ dsh plugin --profile desktop add file:D:/NenniuProjects/atoll/plugins/deepseek-b
 - DeepSeek Harness 侧:确认 profile 的 bundles 里有 `atoll-dsh-bridge`(`~/.dsh/profiles/desktop/package.json`),且装包后重启过桌面版。
 - Qoder 侧:确认 settings.json 的 `hooks` 键已合并(两份配置见上),且改完后重启过 IDE;hook 执行日志在 `~/.qoder-cn/logs`(国内版)。
 - Trae 侧:确认 `~/.trae-cn/hooks.json`(国内版)已合并出 `atoll-*` 条目,且改完后重启过 Trae;可在设置里的 Agent Hooks 页面确认配置已被识别。
+- WorkBuddy 侧:确认 `~/.workbuddy/settings.json`(桌面端)的 `hooks` 键里有 `agent=workbuddy` 的条目(其他工具的 hooks 条目仍在),且改完后重启过 WorkBuddy。
 
 ---
 

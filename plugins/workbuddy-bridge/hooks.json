@@ -1,0 +1,62 @@
+{
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=workbuddy&name=WorkBuddy&state=idle\""
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=workbuddy&name=WorkBuddy&state=working\""
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=workbuddy&name=WorkBuddy&state=working\""
+        }
+      ]
+    }
+  ],
+  "PermissionRequest": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=workbuddy&name=WorkBuddy&state=waiting\""
+        }
+      ]
+    }
+  ],
+  "Notification": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=workbuddy&name=WorkBuddy&state=waiting\""
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "curl.exe -s -m 3 -o NUL \"http://127.0.0.1:41799/api/agent/bridge?agent=workbuddy&name=WorkBuddy&state=completed\""
+        }
+      ]
+    }
+  ]
+}
